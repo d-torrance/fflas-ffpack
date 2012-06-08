@@ -1,0 +1,33 @@
+Source: fflas-ffpack
+Section: math
+Priority: optional
+Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.debian.org>
+Uploaders: Lifeng Sun <lifongsun@gmail.com>
+DM-Upload-Allowed: yes
+Build-Depends: debhelper (>= 8.0.0), autotools-dev, libgmp-dev, libblas-dev, libgivaro-dev, liblapack-dev, doxygen-latex
+Standards-Version: 3.9.3
+Homepage: http://www-ljk.imag.fr/membres/Jean-Guillaume.Dumas/FFLAS/
+Vcs-Git: git://git.debian.org/git/debian-science/packages/fflas-ffpack.git
+Vcs-Browser: http://git.debian.org/?p=debian-science/packages/fflas-ffpack.git
+
+Package: fflas-ffpack
+Architecture: any
+Depends: fflas-ffpack-common (= ${source:Version}), ${misc:Depends}
+Description: Finite field linear algebra subroutines/package
+ FFLAS-FFPACK consists in the creation of a set of routines, giving
+ the same tools as a set of classical Basic Linear Algebra
+ Subroutines, but working over finite fields. In the same way, some
+ other routines of higher level (such as the one in LAPACK) are also
+ produced.
+
+Package: fflas-ffpack-common
+Architecture: all
+Depends: ${misc:Depends}
+Description: Finite field linear algebra subroutines/package - common files
+ FFLAS-FFPACK consists in the creation of a set of routines, giving
+ the same tools as a set of classical Basic Linear Algebra
+ Subroutines, but working over finite fields. In the same way, some
+ other routines of higher level (such as the one in LAPACK) are also
+ produced.
+ .
+ This package provies architecture independent header files.

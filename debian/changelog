@@ -1,0 +1,5 @@
+fflas-ffpack (1.6.0-1) unstable; urgency=low
+
+  * Initial release (Closes: #12345)
+
+ -- Lifeng Sun <lifongsun@gmail.com>  Fri, 08 Jun 2012 19:06:46 +0800

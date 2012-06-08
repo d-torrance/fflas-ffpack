@@ -1,0 +1,4 @@
+version=3
+
+http://linalg.org/projects/fflas-ffpack .*fflas-ffpack-(.*)\.tar\.gz
+
