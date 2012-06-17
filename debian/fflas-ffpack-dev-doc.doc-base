@@ -1,0 +1,9 @@
+Document: fflas-ffpack-dev-doc
+Title: FFLAS-FFPACK Documentation for Developers
+Author: Clément PERNET, Pascal Giorgi, Jean-Guillaume DUMAS, Thierry GAUTIER
+Abstract: Developer-oriented documentation of FFLAS-FFPACK.
+Section: Science/Mathematics
+
+Format: HTML
+Index: /usr/share/doc/fflas-ffpack-dev-doc/index.html
+Files: /usr/share/doc/fflas-ffpack-dev-doc/*.html

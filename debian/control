@@ -4,7 +4,8 @@ Priority: optional
 Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.debian.org>
 Uploaders: Lifeng Sun <lifongsun@gmail.com>
 DM-Upload-Allowed: yes
-Build-Depends: debhelper (>= 8.0.0), autotools-dev, libgmp-dev, libblas-dev, libgivaro-dev, liblapack-dev, doxygen-latex
+Build-Depends: debhelper (>= 8.0.0), autotools-dev, libgmp-dev, libblas-dev, libgivaro-dev (>= 3.7.0), libgivaro-dev (<< 3.8.0), liblapack-dev
+Build-Depends-Indep: doxygen-latex
 Standards-Version: 3.9.3
 Homepage: http://www-ljk.imag.fr/membres/Jean-Guillaume.Dumas/FFLAS/
 Vcs-Git: git://git.debian.org/git/debian-science/packages/fflas-ffpack.git
@@ -13,6 +14,7 @@ Vcs-Browser: http://git.debian.org/?p=debian-science/packages/fflas-ffpack.git
 Package: fflas-ffpack
 Architecture: any
 Depends: fflas-ffpack-common (= ${source:Version}), ${misc:Depends}
+Suggests: fflas-ffpack-user-doc, fflas-ffpack-dev-doc
 Description: Finite field linear algebra subroutines/package
  FFLAS-FFPACK consists in the creation of a set of routines, giving
  the same tools as a set of classical Basic Linear Algebra
@@ -31,3 +33,29 @@ Description: Finite field linear algebra subroutines/package - common files
  produced.
  .
  This package provies architecture independent header files.
+
+Package: fflas-ffpack-user-doc
+Section: doc
+Architecture: all
+Depends: ${misc:Depends}
+Description: FFLAS-FFPACK User Documentation
+ FFLAS-FFPACK consists in the creation of a set of routines, giving
+ the same tools as a set of classical Basic Linear Algebra
+ Subroutines, but working over finite fields. In the same way, some
+ other routines of higher level (such as the one in LAPACK) are also
+ produced.
+ .
+ This package provies user's documentation of FFLAS-FFPACK.
+
+Package: fflas-ffpack-dev-doc
+Section: doc
+Architecture: all
+Depends: ${misc:Depends}
+Description: FFLAS-FFPACK Developer Documentation
+ FFLAS-FFPACK consists in the creation of a set of routines, giving
+ the same tools as a set of classical Basic Linear Algebra
+ Subroutines, but working over finite fields. In the same way, some
+ other routines of higher level (such as the one in LAPACK) are also
+ produced.
+ .
+ This package provies developer's documentation of FFLAS-FFPACK.

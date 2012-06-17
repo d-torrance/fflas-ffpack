@@ -1,0 +1,15 @@
+--- a/doc/mainpage.doxy
++++ b/doc/mainpage.doxy
+@@ -37,10 +37,10 @@
+  *  - \subpage inst. Explains how to configure/install from sources or from the latest
+  *  svn version.
+  *  - \subpage arch. Describes how FFLAS-FFPACK is organized
+- *  - <a href="../fflas-ffpack-html/index.html"     style="color: blue  ;
++ *  - <a href="../fflas-ffpack-user-doc/index.html"     style="color: blue  ;
+  *  font-weight: bold">Documentation for Users</a>. If everything around is
+  *  blue, then you are reading the lighter, user-oriented, documentation.
+- *  - <a href="../fflas-ffpack-dev-html/index.html" style="color: green ;
++ *  - <a href="../fflas-ffpack-dev-doc/index.html" style="color: green ;
+  *  font-weight: bold">Documentation for Developers</a>. If everything around
+  *  is green, then you can get to everything (not necessarily yet) documented.
+  *  .
