@@ -3,10 +3,36 @@ Upstream-Name: fflas-ffpack
 Source: http://linalg.org/projects/fflas-ffpack
 
 Files: *
-Copyright: Clément PERNET <Clement.Pernet@imag.fr>
+Copyright: FFLAS-FFPACK Team
+	   Clément PERNET <Clement.Pernet@imag.fr>
 	   Pascal Giorgi <Pascal.Giorgi@ens-lyon.fr>
 	   Jean-Guillaume DUMAS <Jean-Guillaume.Dumas@imag.fr>
 	   Thierry GAUTIER <Thierry.Gautier@inrialpes.fr>
+License: LGPL-2.1
+
+Files: fflas-ffpack/fflas/fflas_faddm.inl
+       fflas-ffpack/fflas/fflas_faddm_src.inl
+       fflas-ffpack/fflas/fflas_faddmin_src.inl
+       fflas-ffpack/field/modular-balanced-int32.h
+       fflas-ffpack/field/modular-balanced-int64.h
+Copyright: LinBox Team
+License: LGPL-2.1
+
+Files: fflas-ffpack/field/nonzero-randiter.h
+       fflas-ffpack/utils/args-parser.h
+Copyright: 2001-2002 Bradford Hovinen
+License: LGPL-2.1
+
+Files: fflas-ffpack/utils/print-utils.h
+       utils/print-utils.h
+Copyright: 2011 Brice Boyer <bboyer@imag.fr>
+License: LGPL-2.1
+
+Files: fflas-ffpack/utils/timer.C
+       fflas-ffpack/utils/timer.h
+       utils/timer.C
+       utils/timer.h
+Copyright: 1994-1997 Givaro Team
 License: LGPL-2.1
 
 Files: debian/*
