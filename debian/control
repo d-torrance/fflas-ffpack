@@ -5,7 +5,7 @@ Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.
 Uploaders: Lifeng Sun <lifongsun@gmail.com>
 DM-Upload-Allowed: yes
 Build-Depends: debhelper (>= 8.0.0), autotools-dev, libgmp-dev, libblas-dev, libgivaro-dev (>= 3.7.0), libgivaro-dev (<< 3.8.0), liblapack-dev
-Build-Depends-Indep: doxygen-latex
+Build-Depends-Indep: doxygen-latex, texlive-math-extra
 Standards-Version: 3.9.3
 Homepage: http://www-ljk.imag.fr/membres/Jean-Guillaume.Dumas/FFLAS/
 Vcs-Git: git://git.debian.org/git/debian-science/packages/fflas-ffpack.git
