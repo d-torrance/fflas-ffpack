@@ -1,9 +1,9 @@
-/* -*- mode: C++; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
-// vim:sts=4:sw=4:ts=4:noet:sr:cino=>s,f0,{0,g0,(0,\:0,t0,+0,=s
+/* -*- mode: C++; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- */
+// vim:sts=8:sw=8:ts=8:noet:sr:cino=>s,f0,{0,g0,(0,\:0,t0,+0,=s
 
 /*
  * Copyright (C) FFLAS-FFPACK
- * Written by Pascal Giorgi <pascal.giorgi@lirmm.fr>
+ * Written by Clément Pernet <clement.pernet@imag.fr>
  * This file is Free Software and part of FFLAS-FFPACK.
  *
  * ========LICENCE========
@@ -26,205 +26,125 @@
  *.
  */
 
-#include "fflas-ffpack/fflas-ffpack-config.h"
-#include <givaro/modular-integer.h>
+//--------------------------------------------------------------------------
+//                        Test for ftrsm : 1 computation
+//
+//--------------------------------------------------------------------------
+// Clement Pernet
+//-------------------------------------------------------------------------
+
+#define TIME 1
 
 #include <iomanip>
 #include <iostream>
-
+#include "Matio.h"
+#include "fflas-ffpack/field/modular-balanced.h"
 #include "fflas-ffpack/utils/timer.h"
 #include "fflas-ffpack/fflas/fflas.h"
-#include "fflas-ffpack/utils/args-parser.h"
-#include "test-utils.h"
-#include <givaro/modular.h>
-#include <givaro/modular-balanced.h>
 
 
 using namespace std;
 using namespace FFPACK;
-using Givaro::Modular;
-using Givaro::ModularBalanced;
 
-template<typename T>
-void write_matrix(Givaro::Integer p, size_t m, size_t n, T* C, size_t ldc){
-
-	size_t www=(p.bitsize()*log(2.))/log(10.);
-	for (size_t i=0;i<m;++i){
-		cout<<"[ ";
-		cout.width(www+1);
-		cout<<std::right<<C[i*ldc];
-		for (size_t j=1;j<n;++j){
-			cout<<" ";
-			cout.width(www);
-			cout<<std::right<<C[i*ldc+j];
-		}
-		cout<<"]"<<endl;
-	}
-	cout<<endl;
-
-}
-
-
-template<typename Field>
-bool check_ftrsm (const Field &F, size_t m, size_t n, const typename Field::Element &alpha, FFLAS::FFLAS_SIDE side, FFLAS::FFLAS_UPLO uplo, FFLAS::FFLAS_TRANSPOSE trans, FFLAS::FFLAS_DIAG diag){
-
-	typedef typename Field::Element Element;
-	Element * A, *B, *B2, *C, tmp;
-	size_t k = (side==FFLAS::FflasLeft?m:n);
-	size_t lda,ldb,ldc;
-	lda=k+13;
-	ldb=n+14;
-	ldc=n+15;
-	A  = FFLAS::fflas_new(F,k,lda);
-	B  = FFLAS::fflas_new(F,m,ldb);
-	B2 = FFLAS::fflas_new(F,m,ldb);
-	C  = FFLAS::fflas_new(F,m,ldc);
-
-	typename Field::RandIter Rand(F);
-	typename Field::NonZeroRandIter NZRand(F,Rand);
-
-	for (size_t i=0;i<k;++i){
-		for (size_t j=0;j<i;++j)
-			A[i*lda+j]= (uplo == FFLAS::FflasLower)? Rand.random(tmp) : F.zero;
-		A[i*lda+i]= (diag == FFLAS::FflasNonUnit)? NZRand.random(tmp) : F.one;
-		for (size_t j=i+1;j<k;++j)
-			A[i*lda+j]= (uplo == FFLAS::FflasUpper)? Rand.random(tmp) : F.zero;
-	}
-	for (size_t i=0;i<m;++i){
-		for(size_t j=0; j<n; ++j){
-			B[i*ldb+j]= Rand.random(tmp);
-			B2[i*ldb+j]=B[i*ldb+j];
-		}
-	}
-
-	string ss=string((uplo == FFLAS::FflasLower)?"Lower_":"Upper_")+string((side == FFLAS::FflasLeft)?"Left_":"Right_")+string((trans == FFLAS::FflasTrans)?"Trans_":"NoTrans_")+string((diag == FFLAS::FflasUnit)?"Unit":"NonUnit");
-
-	cout<<std::left<<"Checking FTRSM_";
-	cout.fill('.');
-	cout.width(35);
-	cout<<ss;
-
-
-	FFLAS::Timer t; t.clear();
-	double time=0.0;
-	t.clear();
-	t.start();
-	FFLAS::ftrsm (F, side, uplo, trans, diag, m, n, alpha, A, lda, B, ldb);
-	t.stop();
-	time+=t.usertime();
-
-	Element invalpha;
-	F.init(invalpha);
-	F.inv(invalpha, alpha);
-
-	//FFLAS::ftrmm (F, side, uplo, trans, diag, m, n, invalpha, A, k, B, n);
-
-	if (side == FFLAS::FflasLeft)
-		FFLAS::fgemm(F, trans, FFLAS::FflasNoTrans, m, n, m, invalpha, A, lda, B, ldb, F.zero, C, ldc);
-	else
-		FFLAS::fgemm(F, FFLAS::FflasNoTrans, trans, m, n, n, invalpha, B, ldb, A, lda, F.zero, C, ldc);
-
-
-	bool wrong = false;
-	for (size_t i=0;i<m;++i)
-		for (size_t j=0;j<n;++j)
-			if ( !F.areEqual(*(B2+i*ldb+j), *(C+i*ldc+j))){
-				wrong = true;
-			}
-	if ( wrong ){
-		    //cout << "\033[1;31mFAILED\033[0m ("<<time<<")"<<endl;
-		cout << "FAILED ("<<time<<")"<<endl;
-		//cerr<<"FAILED ("<<time<<")"<<endl;
-
-	} else
-		    //cout << "\033[1;32mPASSED\033[0m ("<<time<<")"<<endl;
-		cout << "PASSED ("<<time<<")"<<endl;
-	    //cerr<<"PASSED ("<<time<<")"<<endl;
-
-	F.mulin(invalpha,alpha);
-	if (!F.isOne(invalpha)){
-		cerr<<"invalpha is wrong !!!"<<endl;;
-	}
-
-	FFLAS::fflas_delete(A);
-	FFLAS::fflas_delete(B);
-	FFLAS::fflas_delete(B2);
-	FFLAS::fflas_delete(C);
-	return !wrong;
-}
-template <class Field>
-bool run_with_field (Givaro::Integer q, size_t b, size_t m, size_t n, int s, size_t iters){
-	bool ok = true ;
-	int nbit=(int)iters;
-
-	while (ok &&  nbit){
-		//typedef typename Field::Element Element ;
-		// choose Field
-		Field* F= chooseField<Field>(q,b);
-		if (F==nullptr)
-			return true;
-
-		typename Field::Element alpha;
-		F->init (alpha, (typename Field::Element)s);
-		cout<<"Checking with ";F->write(cout)<<endl;
-
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasLeft,FFLAS::FflasLower,FFLAS::FflasNoTrans,FFLAS::FflasUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasLeft,FFLAS::FflasUpper,FFLAS::FflasNoTrans,FFLAS::FflasUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasLeft,FFLAS::FflasLower,FFLAS::FflasTrans,FFLAS::FflasUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasLeft,FFLAS::FflasUpper,FFLAS::FflasTrans,FFLAS::FflasUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasRight,FFLAS::FflasLower,FFLAS::FflasNoTrans,FFLAS::FflasUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasRight,FFLAS::FflasUpper,FFLAS::FflasNoTrans,FFLAS::FflasUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasRight,FFLAS::FflasLower,FFLAS::FflasTrans,FFLAS::FflasUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasRight,FFLAS::FflasUpper,FFLAS::FflasTrans,FFLAS::FflasUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasLeft,FFLAS::FflasLower,FFLAS::FflasNoTrans,FFLAS::FflasNonUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasLeft,FFLAS::FflasUpper,FFLAS::FflasNoTrans,FFLAS::FflasNonUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasLeft,FFLAS::FflasLower,FFLAS::FflasTrans,FFLAS::FflasNonUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasLeft,FFLAS::FflasUpper,FFLAS::FflasTrans,FFLAS::FflasNonUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasRight,FFLAS::FflasLower,FFLAS::FflasNoTrans,FFLAS::FflasNonUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasRight,FFLAS::FflasUpper,FFLAS::FflasNoTrans,FFLAS::FflasNonUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasRight,FFLAS::FflasLower,FFLAS::FflasTrans,FFLAS::FflasNonUnit);
-		ok = ok && check_ftrsm(*F,m,n,alpha,FFLAS::FflasRight,FFLAS::FflasUpper,FFLAS::FflasTrans,FFLAS::FflasNonUnit);
-		nbit--;
-		delete F;
-	}
-	return ok;
-}
+typedef Modular<double> Field;
+//typedef ModularBalanced<float> Field;
 
 int main(int argc, char** argv)
 {
+
+	int k,n,m;
 	cerr<<setprecision(10);
-	static Givaro::Integer q=-1;
-	static size_t b=0;
-	static size_t m=128;
-	static size_t n=128;
-	static size_t s=1;
-	static size_t iters=1;
-	static bool loop=false;
-	static Argument as[] = {
-		{ 'q', "-q Q", "Set the field characteristic (-1 for random).",         TYPE_INTEGER , &q },
-                { 'b', "-b B", "Set the bitsize of the field characteristic.",  TYPE_INT , &b },
-                { 'm', "-m M", "Set the row dimension of unknown matrix.",      TYPE_INT , &m },
-                { 'n', "-n N", "Set the column dimension of the unknown matrix.", TYPE_INT , &n },
-                { 's', "-s S", "Set the scaling of trsm",                         TYPE_INT , &s },
-		{ 'i', "-i R", "Set number of repetitions.",            TYPE_INT , &iters },
-		{ 'l', "-loop Y/N", "run the test in an infinite loop.", TYPE_BOOL , &loop },
-                END_OF_ARGUMENTS
-        };
+	Field::Element zero, one;
 
-	FFLAS::parseArguments(argc,argv,as);
+	if (argc != 10)	{
+		cerr<<"Usage : test-ftrsm <p> <A> <B> <iter> <alpha> <left/right> <Up/Low> <NoTrans/Trans> <NonUnit/Unit>"
+		    <<endl;
+		exit(-1);
+	}
+	int nbit=atoi(argv[4]); // number of times the product is performed
+	Field F(atof(argv[1]));
+	F.init(zero,0.0);
+	F.init(one,1.0);
+	Field::Element * A, *B, *B2;
+	A = read_field(F,argv[2],&k,&k);
+	B = read_field(F,argv[3],&m,&n);
+	B2 = new Field::Element[m*n];
 
-	bool ok = true;
-	do{
-	 	ok &= run_with_field<Modular<double> >(q,b,m,n,s,iters);
-		ok &= run_with_field<ModularBalanced<double> >(q,b,m,n,s,iters);
-		ok &= run_with_field<Modular<float> >(q,b,m,n,s,iters);
-		ok &= run_with_field<ModularBalanced<float> >(q,b,m,n,s,iters);
-		ok &= run_with_field<Modular<int32_t> >(q,b,m,n,s,iters);
-		ok &= run_with_field<ModularBalanced<int32_t> >(q,b,m,n,s,iters);
-		ok &= run_with_field<Modular<int64_t> >(q,b,m,n,s,iters);
-		ok &= run_with_field<ModularBalanced<int64_t> >(q,b,m,n,s,iters);
-		ok &= run_with_field<Modular<Givaro::Integer> >(q,(b?b:512),m,n,s,iters); // BUG: random entry are not of the chosen bitsize (RandIter are wrong)
-	} while (loop && ok);
 
-	return !ok ;
+	for (int i=0; i<m;++i){
+		for(int j=0; j<n; ++j)
+			F.assign(*(B2+i*n+j),*(B+i*n+j));
+	}
+
+	Field::Element alpha;
+	F.init (alpha, atof(argv[5]));
+
+	FFLAS::FFLAS_SIDE side = (atoi(argv[6])) ? FFLAS::FflasRight :  FFLAS::FflasLeft;
+	FFLAS::FFLAS_UPLO uplo = (atoi(argv[7])) ? FFLAS::FflasLower :  FFLAS::FflasUpper;
+	FFLAS::FFLAS_TRANSPOSE trans = (atoi(argv[8])) ? FFLAS::FflasTrans :  FFLAS::FflasNoTrans;
+	FFLAS::FFLAS_DIAG diag = (atoi(argv[9])) ? FFLAS::FflasUnit :  FFLAS::FflasNonUnit;
+
+	if (   ((side == FFLAS::FflasRight) &&(k != n))
+	    || ((side == FFLAS::FflasLeft)&&(k != m))) {
+		cerr<<"Error in the dimensions of the input matrices"<<endl;
+		exit(-1);
+	}
+
+	Timer t; t.clear();
+	double time=0.0;
+	
+	for(int i = 0;i<nbit;++i){
+		t.clear();
+		t.start();
+		FFLAS::ftrsm (F, side, uplo, trans, diag, m, n, alpha, A, k, B, n);
+		t.stop();
+		time+=t.usertime();
+		if (i+1<nbit)
+			for (int i=0; i<m*n;++i)
+				F.assign(*(B+i),*(B2+i));
+	}
+
+#if DEBUG
+	Field::Element invalpha;
+	F.inv(invalpha, alpha);
+	FFLAS::ftrmm (F, side, uplo, trans, diag, m, n, invalpha, A, k, B, n);
+	bool wrong = false;
+
+	for (int i=0;i<m;++i)
+		for (int j=0;j<n;++j)
+			if ( !F.areEqual(*(B2+i*n+j), *(B+i*n+j))){
+				cerr<<"B2 ["<<i<<", "<<j<<"] = "<<(*(B2+i*n+j))
+				    <<" ; B ["<<i<<", "<<j<<"] = "<<(*(B+i*n+j))
+				    <<endl;
+				wrong = true;
+			}
+
+	if ( wrong ){
+		cerr<<"FAIL"<<endl;
+		    //write_field (F,cerr<<"B2="<<endl,B2,m,n,n);
+		    //write_field (F,cerr<<"B="<<endl,B,m,n,n);
+	} else
+		cerr<<"PASS"<<endl;
+#endif
+
+	delete[] A;
+	delete[] B;
+	delete[] B2;
+
+#if TIME
+	double mflops = m*n/1000000.0*nbit*n/time;
+	cerr<<"m,n = "<<m<<" "<<n<<". ftrsm "
+	    <<((side == FFLAS::FflasLeft)?" Left ":" Right ")
+	    <<((uplo == FFLAS::FflasLower)?" Lower ":" Upper ")
+	    <<((diag == FFLAS::FflasUnit)?" Unit ":" NonUnit ")
+	    <<((trans == FFLAS::FflasTrans)?" Trans ":" NoTrans ")
+	    <<"over Z/"<<atoi(argv[1])<<"Z :"
+	    <<endl
+	    <<"t= "
+	    << time/nbit
+	    << " s, Mffops = "<<mflops
+	    << endl;
+
+	cout<<m<<" "<<n<<" "<<mflops<<" "<<time/nbit<<endl;
+#endif
 }
