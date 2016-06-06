@@ -159,3 +159,7 @@ new_examp_comp = $(CXX) $(CXXFLAGS) $(AM_CXXFLAGS)  ${INCLUDES} $(AM_CPPFLAGS) $
 
 %:%.cpp
 	$(new_examp_comp)
+
+if INTF_MATLAB_USED
+SUBDIRS += matlab
+endif
