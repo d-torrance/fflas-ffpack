@@ -55,7 +55,7 @@ fflas-ffpack/paladin/Makefile
 fflas-ffpack/paladin/Makefile.in
 fflas-ffpack/utils/Makefile
 fflas-ffpack/utils/Makefile.in
-interfaces/
+#interfaces/
 libtool
 macros/CodeChunk/Makefile
 macros/CodeChunk/Makefile.in
