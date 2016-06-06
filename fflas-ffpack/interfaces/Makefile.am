@@ -22,3 +22,5 @@
 pkgincludesubdir=$(pkgincludedir)/interfaces
 SUBDIRS=libs
 EXTRA_DIST=interfaces.doxy
+SUBDIRS += src
+
