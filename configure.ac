@@ -275,7 +275,18 @@ FF_CHECK_USER_LAPACK
 	# FF_CHECK_BLAS2
 # fi
 
+######################################################
+# Interfaces (if required) - Thomas Izard (SILKAN)
+#   Granted by the ANR project HPAC
+######################################################
 
+TOPDIR=`pwd`
+FF_INTF_CHECK_MATLAB
+FF_INTF_CHECK_CXX
+
+######################################################
+# End Interfaces
+######################################################
 
 if test "$BLAS_FOUND" = "false" ; then
 	echo ''
@@ -353,6 +364,11 @@ benchmarks/Makefile
 examples/Makefile
 optimiser/Makefile
 fflas-ffpack.pc
+])
+AC_CONFIG_FILES([
+fflas-ffpack/interfaces/src/matlab/Makefile
+tests/matlab/Makefile
+fflas-ffpack/interfaces/src/Makefile
 ])
 AC_OUTPUT
 
