@@ -5,9 +5,9 @@
  * -----------------------------------------------------------------------------
  *
  *  This file is part of FFinter.
- * 
+ *
  *  FFinter is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU Lesser General Public License as published 
+ *  it under the terms of the GNU Lesser General Public License as published
  *  by the Free Software Foundation, either version 3 of the License, or
  *  (at your option) any later version.
  *
@@ -15,14 +15,14 @@
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU Lesser General Public License for more details.
- * 
+ *
  *  You should have received a copy of the GNU Lesser General Public License
  *  along with FFinter.  If not, see <http://www.gnu.org/licenses/>.
  *
  * -----------------------------------------------------------------------------
  *
  *  The FFinter software is part of the HPAC project.
- *  The HPAC project is granted by the french "Agence Nationale de la 
+ *  The HPAC project is granted by the french "Agence Nationale de la
  *  Recherche" (ANR).
  *
  * -------------------------------------------------------------------------- */
@@ -36,6 +36,42 @@
 #include "mat.h"
 #include "mex.h"
 #include "matrix.h"
+
+// -----------------------------------------------------------------------------
+
+class Integer {};
+
+template < typename T > struct MXWrapper {};
+template < > struct MXWrapper<int32_t> {
+  static const mxClassID classID = mxINT32_CLASS;
+  static bool is(const mxArray* array) { return mxIsInt32(array); }
+};
+
+template < > struct MXWrapper<int64_t>
+{
+  static const mxClassID classID = mxINT64_CLASS;
+  static bool is(const mxArray* array) { return mxIsInt64(array); }
+};
+
+template < > struct MXWrapper<float>   {
+  static const mxClassID classID = mxSINGLE_CLASS;
+  static bool is(const mxArray* array) { return mxIsSingle(array); }
+};
+
+template < > struct MXWrapper<double>  {
+  static const mxClassID classID = mxDOUBLE_CLASS;
+  static bool is(const mxArray* array) { return mxIsDouble(array); }
+};
+
+template < > struct MXWrapper<Integer>  {
+  static const mxClassID classID = mxDOUBLE_CLASS;
+  static bool is(const mxArray*) { return false; }
+};
+
+template < > struct MXWrapper<size_t>  {
+  static const mxClassID classID = mxUINT64_CLASS;
+  static bool is(const mxArray* array) { return mxIsUint64(array); }
+};
 
 // -----------------------------------------------------------------------------
 
@@ -55,7 +91,7 @@ namespace ffintert {
   typedef unsigned long long int uint64;
 
 
-  void error(const std::string& txt) 
+  void error(const std::string& txt)
   {
     mexErrMsgIdAndTxt("fflaswgrt:error", txt.c_str());
   }
@@ -70,9 +106,9 @@ namespace ffintert {
 
   // ---------------------------------------------------------------------------
 
-  bool isSize(const mxArray* array) 
-  { 
-    return (mxIsUint32(array) || mxIsUint64(array) || mxIsUint16(array) || mxIsUint8(array)); 
+  bool isSize(const mxArray* array)
+  {
+    return (mxIsUint32(array) || mxIsUint64(array) || mxIsUint16(array) || mxIsUint8(array));
   }
 
   // ---------------------------------------------------------------------------
@@ -87,14 +123,15 @@ namespace ffintert {
 
   bool isInt(const mxArray* array) { return
       mxIsDouble(array)
-      || mxIsInt32(array) || mxIsUint32(array) 
+      || mxIsInt32(array) || mxIsUint32(array)
       || mxIsInt64(array) || mxIsUint64(array)
       || mxIsInt16(array) || mxIsUint16(array)
       || mxIsInt8(array)  || mxIsUint8(array); }
 
   // ---------------------------------------------------------------------------
 
-  bool isElement(const mxArray* array) { return mxIsDouble(array); }
+  template < typename T >
+  bool isElement(const mxArray* array) { return MXWrapper<T>::is(array); }
 
   // ---------------------------------------------------------------------------
 
@@ -102,28 +139,29 @@ namespace ffintert {
 
   // ---------------------------------------------------------------------------
 
-  bool isVector(const mxArray* array) 
+  template < typename T >
+  bool isVector(const mxArray* array)
   {
-    return mxGetNumberOfDimensions(array) == 2 && 
-      (mxGetDimensions(array)[0] == 1 || mxGetDimensions(array)[1] == 1);
+    return MXWrapper<T>::is(array) && mxGetNumberOfDimensions(array) == 2 && (mxGetDimensions(array)[0] == 1 || mxGetDimensions(array)[1] == 1);
   }
 
   // ---------------------------------------------------------------------------
 
-  bool isMatrix(const mxArray* array) 
+  template < typename T >
+  bool isMatrix(const mxArray* array)
   {
-    return mxGetNumberOfDimensions(array) == 2;
+    return MXWrapper<T>::is(array) && mxGetNumberOfDimensions(array) == 2;
   }
 
   // ---------------------------------------------------------------------------
-  
-  bool           getBool(const mxArray* array) 
+
+  bool           getBool(const mxArray* array)
   {
     return mxGetLogicals(array)[0];
   }
 
   // ---------------------------------------------------------------------------
-  
+
   // Generate getOrientation, getUplo...
 #define GEN_GET_FLAG(__TYPE__, __LETTER__, __S1__, __S2__)	\
   __TYPE__ get##__LETTER__(const mxArray* array)		\
@@ -133,17 +171,17 @@ namespace ffintert {
     if (mxGetString(array, str, dim+1))				\
       error("can not read string.");				\
     if (!strcmp(str, #__S1__))					\
-      return __S1__;						\
+      return Fflas##__S1__;					\
     else if (!strcmp(str, #__S2__))				\
-      return __S2__;						\
+      return Fflas##__S2__;					\
     error("unknown flag '" + std::string(str) + "'.");		\
-    return __S1__;						\
+    return Fflas##__S1__;					\
   }
 
-  GEN_GET_FLAG(FlagTrans, Orientation, NoTrans, Trans);
-  GEN_GET_FLAG(FlagUplo,  Uplo,  Upper,   Lower);
-  GEN_GET_FLAG(FlagSide,  Side,  Left,    Right);
-  GEN_GET_FLAG(FlagDiag,  Diag,  NonUnit, Unit);
+  GEN_GET_FLAG(FFLAS_C_TRANSPOSE, Orientation, NoTrans, Trans);
+  GEN_GET_FLAG(FFLAS_C_UPLO,      Uplo,        Upper,   Lower);
+  GEN_GET_FLAG(FFLAS_C_SIDE,      Side,        Left,    Right);
+  GEN_GET_FLAG(FFLAS_C_DIAG,      Diag,        NonUnit, Unit);
 
   // Generate isOrientation, isUplo...
 #define GEN_IS_FLAG(__LETTER__, __S1__, __S2__)			\
@@ -156,19 +194,19 @@ namespace ffintert {
   }
 
   GEN_IS_FLAG(Orientation, NoTrans, Trans);
-  GEN_IS_FLAG(Uplo,  Upper,   Lower);
-  GEN_IS_FLAG(Side,  Left,    Right);
-  GEN_IS_FLAG(Diag,  NonUnit, Unit);
+  GEN_IS_FLAG(Uplo,        Upper,   Lower);
+  GEN_IS_FLAG(Side,        Left,    Right);
+  GEN_IS_FLAG(Diag,        NonUnit, Unit);
 
 
   // ---------------------------------------------------------------------------
 
-  size_t         getSize(const mxArray* array) 
+  size_t         getSize(const mxArray* array)
   {
     size_t ret = 0;
     switch (mxGetClassID(array)) {
     case mxLOGICAL_CLASS: ret = (size_t) mxGetLogicals(array)[0]; break;
-    case mxDOUBLE_CLASS:  ret = (size_t) mxGetPr(array)[0]; break;      
+    case mxDOUBLE_CLASS:  ret = (size_t) mxGetPr(array)[0]; break;
     case mxSINGLE_CLASS:  ret = (size_t) ((float*) mxGetData(array))[0]; break;
     case mxINT8_CLASS:    ret = (size_t) ((int8*)  mxGetData(array))[0]; break;
     case mxUINT8_CLASS:   ret = (size_t) ((uint8*) mxGetData(array))[0]; break;
@@ -187,28 +225,29 @@ namespace ffintert {
 
   // ---------------------------------------------------------------------------
 
-  double         getField(const mxArray* array) 
+  double         getField(const mxArray* array)
   {
     return mxGetPr(array)[0];
   }
 
   // ---------------------------------------------------------------------------
 
-  double         getElement(const mxArray* array) 
+  template < typename T >
+  T     getElement(const mxArray* array)
+  {
+    return ((T*)mxGetData(array))[0];
+  }
+
+  // ---------------------------------------------------------------------------
+
+  double         getReal(const mxArray* array)
   {
     return mxGetPr(array)[0];
   }
 
   // ---------------------------------------------------------------------------
 
-  double         getReal(const mxArray* array) 
-  {
-    return mxGetPr(array)[0];
-  }
-
-  // ---------------------------------------------------------------------------
-
-  int            getInt(const mxArray* array) 
+  int            getInt(const mxArray* array)
   {
     if (mxIsDouble(array)) (int) ((double*)mxGetData(array))[0];
     return ((int*)mxGetData(array))[0];
@@ -216,51 +255,109 @@ namespace ffintert {
 
   // ---------------------------------------------------------------------------
 
-  Vector<double> getVector(const mxArray* array) 
+  template < typename T >
+  Vector<T> getVector(const mxArray* array)
   {
-    return createVector(mxGetPr(array), mxGetNumberOfElements(array));
+    return createVector((T*)mxGetData(array), mxGetNumberOfElements(array));
+  }
+
+  template < typename T > const T* constptr(const Vector<T>& v) { return v._p; }
+  template < typename T >       T*      ptr(const Vector<T>& v) { return v._p; }
+
+  template < typename T >
+  Vector<T> cloneVector(const mxArray* array)
+  {
+    size_t m = mxGetM(array);
+    size_t n = mxGetN(array);
+    T* ptr = (T*) malloc(sizeof(T) * m * n);
+    std::memcpy(ptr, mxGetData(array), sizeof(T) * m * n);
+    return createVector(ptr, m * n);
+  }
+
+  template < typename T >
+  void clear(Vector<T>& m)
+  {
+    free(m._p);
   }
 
   // ---------------------------------------------------------------------------
 
-  Matrix<double> getMatrix(const mxArray* array) 
+  template < typename T >
+  Matrix<T> getMatrix(const mxArray* array)
   {
-    return createMatrix(mxGetPr(array), mxGetM(array), mxGetN(array), CMO);
+    return createMatrix((T*)mxGetData(array), mxGetM(array), mxGetN(array), CMO);
+  }
+
+  template < typename T > const T* constptr(const Matrix<T>& m) { return m._p; }
+  template < typename T >       T*      ptr(const Matrix<T>& m) { return m._p; }
+
+  template < typename T >
+  Matrix<T> cloneMatrix(const mxArray* array)
+  {
+    size_t m = mxGetM(array);
+    size_t n = mxGetN(array);
+    T* ptr = (T*) malloc(sizeof(T) * m * n);
+    std::memcpy(ptr, mxGetData(array), sizeof(T) * m * n);
+    return createMatrix(ptr, m, n, CMO);
+  }
+
+  template < typename T >
+  void clear(Matrix<T>& m)
+  {
+    free(m._p);
   }
 
   // ---------------------------------------------------------------------------
 
-  Matrix<double> createMatrix (mxArray*& array, size_t m, size_t n) 
+  template < typename T >
+  Matrix<T> createMatrix (mxArray*& array, size_t m, size_t n)
   {
-    array = mxCreateDoubleMatrix(m, n, mxREAL);
-    return createMatrix(mxGetPr(array), m, n, CMO);
+    array = mxCreateNumericMatrix(m, n, MXWrapper<T>::classID, mxREAL);
+    return createMatrix((T*)mxGetData(array), m, n, CMO);
   }
 
   // ---------------------------------------------------------------------------
 
-  Vector<double> createVector (mxArray*& array, size_t l) 
+  template < typename T >
+  Vector<T> createVector (mxArray*& array, size_t l)
   {
-    array = mxCreateDoubleMatrix(l, 1, mxREAL);
-    return createVector(mxGetPr(array), l);
+    array = mxCreateNumericMatrix(l, 1, MXWrapper<T>::classID, mxREAL);
+    return createVector((T*)mxGetData(array), l);
   }
 
   // ---------------------------------------------------------------------------
 
-  void        createAndSetBool   (mxArray*& array, bool el) 
+  void        createAndSetBool   (mxArray*& array, bool el)
   {
-    array = mxCreateLogicalScalar(el);    
+    array = mxCreateLogicalScalar(el);
   }
 
   // ---------------------------------------------------------------------------
 
-  void        createAndSetReal   (mxArray*& array, double el) 
+  void        createAndSetInt   (mxArray*& array, int el)
+  {
+    array = mxCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL);
+    ((int*)mxGetData(array))[0] = el;
+  }
+
+  // ---------------------------------------------------------------------------
+
+  void        createAndSetReal   (mxArray*& array, double el)
   {
     array = mxCreateDoubleScalar(el);
   }
 
   // ---------------------------------------------------------------------------
 
-  void         createAndSetElement(mxArray*& array, double el) 
+  void         createAndSetSize(mxArray*& array, size_t el)
+  {
+    array = mxCreateNumericMatrix(1, 1, mxUINT64_CLASS, mxREAL);
+    mxGetPr(array)[0] = el;
+  }
+
+  // ---------------------------------------------------------------------------
+
+  void         createAndSetElement(mxArray*& array, double el)
   {
     array = mxCreateDoubleMatrix(1, 1, mxREAL);
     mxGetPr(array)[0] = el;
@@ -268,20 +365,31 @@ namespace ffintert {
 
   // ---------------------------------------------------------------------------
 
-  Vector<double> duplicateVector(const mxArray* src, mxArray*& ret)
+  template < typename T >
+  void         createAndSetElement(mxArray*& array, T el)
   {
-    ret = mxDuplicateArray(src);
-    return createVector(mxGetPr(ret), mxGetNumberOfElements(ret));
+    array = mxCreateNumericMatrix(1, 1, MXWrapper<T>::classID, mxREAL);
+    ((T*)mxGetData(array))[0] = el;
   }
-  
+
   // ---------------------------------------------------------------------------
 
-  Matrix<double> duplicateMatrix(const mxArray* src, mxArray*& ret)
+  template < typename T >
+  Vector<T> duplicateVector(const mxArray* src, mxArray*& ret)
   {
     ret = mxDuplicateArray(src);
-    return createMatrix(mxGetPr(ret), mxGetM(ret), mxGetN(ret), CMO);
+    return createVector((T*)mxGetData(ret), mxGetNumberOfElements(ret));
   }
-  
+
+  // ---------------------------------------------------------------------------
+
+  template < typename T >
+  Matrix<T> duplicateMatrix(const mxArray* src, mxArray*& ret)
+  {
+    ret = mxDuplicateArray(src);
+    return createMatrix((T*)mxGetData(ret), mxGetM(ret), mxGetN(ret), CMO);
+  }
+
 };
 
 // -----------------------------------------------------------------------------

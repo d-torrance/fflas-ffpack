@@ -27,18 +27,37 @@
  *
  * -------------------------------------------------------------------------- */
 
-// -----------------------------------------------------------------------------
-// This file contains the runtime functions specific to the CXX wrappers.
-// In particular, in this file must be defined function concerning types:
-// to<Name of type> : taking a RT type and returning a FFLAS type (explicit cast
-//                    function)
-// -----------------------------------------------------------------------------
-
-#ifndef _FFINTERT_CXX_H_
-#define _FFINTERT_CXX_H_
+#ifndef _FFLAS_C_TYPES_H_
+#define _FFLAS_C_TYPES_H_
 
 // -----------------------------------------------------------------------------
 
-#include "ffintert.h"
+enum FP_C_RP { FP_C_RP_Modular, FP_C_RP_ModularBalanced };
 
-#endif // _FFINTERT_CXX_H_
+// public:
+/// Is matrix transposed ?
+enum FFLAS_C_TRANSPOSE {
+  FflasNoTrans = 111, /**< Matrix is not transposed */
+  FflasTrans   = 112  /**< Matrix is transposed */
+};
+/// Is triangular matrix's shape upper ?
+enum FFLAS_C_UPLO {
+  FflasUpper = 121, /**< Triangular matrix is Upper triangular (if \f$i>j\f$ then \f$T_{i,j} = 0\f$)*/
+  FflasLower = 122  /**< Triangular matrix is Lower triangular (if \f$i<j\f$ then \f$T_{i,j} = 0\f$)*/
+};
+
+/// Is the triangular matrix implicitly unit diagonal ?
+enum FFLAS_C_DIAG {
+  FflasNonUnit = 131, /**< Triangular matrix has an explicit arbitrary diagonal */
+  FflasUnit    = 132 /**< Triangular matrix has an implicit unit diagonal (\f$T_{i,i} = 1\f$)*/ /**< */
+};
+
+/// On what side ?
+enum FFLAS_C_SIDE {
+  FflasLeft  = 141,/**< Operator applied on the left */
+  FflasRight = 142 /**< Operator applied on the rigth*/
+};
+
+// -----------------------------------------------------------------------------
+
+#endif // _FFLAS_C_TYPES_H_
