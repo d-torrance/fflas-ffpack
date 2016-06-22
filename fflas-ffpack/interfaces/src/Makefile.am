@@ -27,7 +27,4 @@ if INTF_MATLAB_USED
 SUBDIRS += matlab
 endif
 
-if INTF_MAPLE_USED
-SUBDIRS += maple
-endif
 
