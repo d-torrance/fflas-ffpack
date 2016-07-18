@@ -5,21 +5,22 @@
  * Copyright (C) 2005 Clement Pernet
  *
  * Written by Clement Pernet <Clement.Pernet@imag.fr>
+ *            Brice Boyer (briceboyer) <boyer.brice@gmail.com>
  *
- * 
+ *
  * ========LICENCE========
  * This file is part of the library FFLAS-FFPACK.
- * 
+ *
  * FFLAS-FFPACK is free software: you can redistribute it and/or modify
  * it under the terms of the  GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
@@ -29,6 +30,86 @@
 
 #ifndef __FFLASFFPACK_fgemv_INL
 #define __FFLASFFPACK_fgemv_INL
+
+#include <givaro/zring.h> // DoubleDomain
+
+#if defined(__AVX2__) or defined(__AVX__) or defined(__SSE4_1__)
+#include "fflas-ffpack/fflas/fflas_igemm/igemm.h"
+#endif
+
+namespace FFLAS{ namespace Protected {
+	template <typename FloatElement, class Field>
+	inline typename Field::Element_ptr
+	fgemv_convert (const Field& F,
+		       const FFLAS_TRANSPOSE ta,
+		       const size_t M, const size_t N,
+		       const typename Field::Element alpha,
+		       typename Field::ConstElement_ptr A,const size_t lda,
+		       typename Field::ConstElement_ptr X,const size_t incX,
+		       const typename Field::Element beta,
+		       typename Field::Element_ptr Y, const size_t incY)
+	{
+		FFLASFFPACK_check(lda);
+
+		Givaro::ModularBalanced<FloatElement> G((FloatElement) F.characteristic());
+		FloatElement tmp,alphaf, betaf;
+		F.convert (tmp, beta);
+		G.init(betaf,tmp);
+		F.convert (tmp, alpha);
+		G.init(alphaf,tmp);
+		size_t ma, na;
+		if (ta == FflasTrans) { ma = N; na = M; }
+		else { ma = M; na = N; }
+		// sizet ldaf = na;
+		FloatElement* Af = FFLAS::fflas_new<FloatElement>(M*N);
+		FloatElement* Xf = FFLAS::fflas_new<FloatElement>(na);
+		FloatElement* Yf = FFLAS::fflas_new<FloatElement>(ma);
+
+		fconvert(F, M, N, Af, N, A, lda);
+		freduce (G, M, N, Af, N);
+		fconvert(F, na, Xf, 1, X, incX);
+		freduce (G, na, Xf, 1);
+
+		if (!F.isZero(beta)){
+			fconvert (F, ma, Yf, 1, Y, incY);
+			freduce (G, ma, Yf, 1);
+		}
+
+		fgemv (G, ta, M, N, alphaf, Af, N, Xf, 1, betaf, Yf, 1);
+
+		finit(F, ma, Yf, 1, Y, incY);
+		fflas_delete (Af);
+		fflas_delete (Xf);
+		fflas_delete (Yf);
+		return Y;
+	}
+	}// Protected
+}// FFLAS
+
+namespace FFLAS {
+	template<class Field>
+	inline  typename Field::Element_ptr
+	fgemv (const Field& F,
+	       const FFLAS_TRANSPOSE ta,
+	       const size_t M, const size_t N,
+	       const typename Field::Element alpha,
+	       typename Field::ConstElement_ptr A, const size_t lda,
+	       typename Field::ConstElement_ptr X, const size_t incX,
+	       const typename Field::Element beta,
+	       typename Field::Element_ptr Y, const size_t incY,
+	       MMHelper<Field, MMHelperAlgo::Classic, ModeCategories::ConvertTo<ElementCategories::MachineFloatTag> > & H)
+	{
+		if (F.cardinality() < DOUBLE_TO_FLOAT_CROSSOVER)
+			return Protected::fgemv_convert<float,Field>(F,ta,M,N,alpha,A,lda,X, incX, beta,Y,incY);
+		else if (16*F.cardinality() < Givaro::ModularBalanced<double>::maxCardinality())
+			return Protected::fgemv_convert<double,Field>(F,ta,M,N,alpha,A,lda,X, incX, beta,Y,incY);
+		else {
+			FFPACK::failure()(__func__,__LINE__,"Invalid ConvertTo Mode for this field");
+		}
+		return Y;
+	}
+}// FFLAS
+
 namespace FFLAS {
 
 	//---------------------------------------------------------------------
@@ -36,341 +117,341 @@ namespace FFLAS {
 	// Computes  Y <- alpha.op(A).X + beta.Y
 	// A is M*N,
 	//---------------------------------------------------------------------
+
 	template<class Field>
-	inline void
-	fgemv (const Field& F, const FFLAS_TRANSPOSE TransA,
+	inline typename Field::Element_ptr
+	fgemv (const Field& F, const FFLAS_TRANSPOSE ta,
 	       const size_t M, const size_t N,
 	       const typename Field::Element alpha,
-	       const typename Field::Element * A, const size_t lda,
-	       const typename Field::Element * X, const size_t incX,
+	       typename Field::ConstElement_ptr A, const size_t lda,
+	       typename Field::ConstElement_ptr X, const size_t incX,
 	       const typename Field::Element beta,
-	       typename Field::Element * Y, const size_t incY)
+	       typename Field::Element_ptr Y, const size_t incY,
+	       MMHelper<Field, MMHelperAlgo::Classic, ModeCategories::DelayedTag> & H)
 	{
 
-		if (F.isZero (alpha)){
-			for  (typename Field::Element * Yi = Y; Yi != Y+((TransA == FflasNoTrans)?M:N)*incY; Yi+=incY)
-				F.mulin(*Yi, beta);
-			return;
+		if (!M) {return Y;}
+		size_t Ydim = (ta == FflasNoTrans)?M:N;
+		size_t Xdim = (ta == FflasNoTrans)?N:M;
+		if (!Xdim || F.isZero (alpha)){
+			fscalin(F, Ydim, beta, Y, incY);
+			return Y;
 		}
 
-		FFLAS_BASE base = Protected::BaseCompute (F, 0);
-		size_t kmax = Protected::DotProdBound (F, 0, beta, base);
+		typename Field::Element alpha_,beta_;
+		F.assign (alpha_,alpha);
+		F.assign (beta_,beta);
+		if (Protected::AreEqual<Field, Givaro::Modular<double> >::value ||
+		    Protected::AreEqual<Field, Givaro::ModularBalanced<double> >::value){
+			    //Givaro::Modular<double> need to switch to float if p too small
+			if (F.characteristic() < DOUBLE_TO_FLOAT_CROSSOVER)
+				return Protected::fgemv_convert<float,Field>(F,ta,M,N,alpha,A,lda,X,incX,beta,Y,incY);
+		}
 
-		if (kmax > 1) {
-			if  (TransA == FflasNoTrans) {
-				size_t nblock = N / kmax;
-				size_t remblock = N % kmax;
-				// To ensure the initial computation with beta
-				if (!remblock){
-					remblock = kmax;
-					--nblock;
-				}
-
-				Protected::MatVectProd (F, FflasNoTrans, M, remblock, alpha,
-					     A+kmax*nblock, lda, X+kmax*nblock*incX, incX, beta,
-					     Y, incY);
-				for  (size_t i = 0; i < nblock; ++i){
-					Protected::MatVectProd (F, FflasNoTrans, M, kmax, alpha,
-						     A+i*kmax, lda, X+i*kmax*incX, incX, F.one,
-						     Y, incY);
-				}
+		if (Protected::AreEqual<Field, Givaro::Modular<int64_t> >::value ||
+		    Protected::AreEqual<Field, Givaro::ModularBalanced<int64_t> >::value){
+			if (16*F.cardinality() < Givaro::ModularBalanced<double>::maxCardinality())
+				return Protected::fgemv_convert<double,Field>(F,ta,M,N,alpha,A,lda,X, incX,beta,Y,incY);
+			else{
+				    // Stay over int64_t
+				MMHelper<Field, MMHelperAlgo::Classic, ModeCategories::LazyTag, ParSeqHelper::Sequential> HG(H);
+				HG.recLevel = 0;
+				if (ta == FflasNoTrans)
+					fgemm(F,FflasNoTrans,FflasNoTrans,M,1,N,alpha,A,lda,X,incX,beta,Y,incY,HG);
+				else
+					fgemm(F,FflasTrans,FflasNoTrans,N,1,M,alpha,A,lda,X,incX,beta,Y,incY,HG);
+				freduce(F,(ta==FflasNoTrans)?M:N, Y,incY);
+				H.initOut();
+				return Y;
 			}
-			else{ // FflasTrans
-				size_t nblock = M / kmax;
-				size_t remblock = M % kmax;
-				// To ensure the initial computation with beta
-				if (!remblock){
-					remblock = kmax;
-					--nblock;
-				}
+		}
+		if ( !F.isOne(alpha) && !F.isMOne(alpha)){
+			F.assign (alpha_, F.one);
+			F.div (beta_, beta, alpha);
+		}
+		MMHelper<Field, MMHelperAlgo::Classic, ModeCategories::LazyTag> HD(F,0);
 
-				Protected::MatVectProd (F, FflasTrans, remblock, N, alpha,
-					     A+kmax*nblock*lda, lda, X+kmax*nblock*incX, incX, beta,
-					     Y, incY);
-				for  (size_t i = 0; i < nblock; ++i){
-					Protected::MatVectProd (F, FflasTrans, kmax, N, alpha,
-						     A+i*kmax*lda, lda, X+i*kmax*incX, incX, F.one,
-						     Y, incY);
-				}
+		fgemv (F, ta, M, N, alpha_,
+		       FFPACK::fflas_const_cast<typename Field::Element_ptr>(A), lda,
+		       FFPACK::fflas_const_cast<typename Field::Element_ptr>(X), incX,
+		       beta_, Y, incY, HD);
 
+		Protected::ScalAndReduce (F, Ydim, alpha, Y, incY, HD);
+		H.initOut();
+
+		return Y;
+	}
+
+
+
+}
+
+namespace FFLAS{
+	template<class Field>
+	inline typename Field::Element_ptr
+	fgemv (const Field& F, const FFLAS_TRANSPOSE ta,
+	       const size_t M, const size_t N,
+	       const typename Field::Element alpha,
+	       typename Field::ConstElement_ptr A, const size_t lda,
+	       typename Field::ConstElement_ptr X, const size_t incX,
+	       const typename Field::Element beta,
+	       typename Field::Element_ptr Y, const size_t incY,
+	       MMHelper<Field, MMHelperAlgo::Classic, ModeCategories::DefaultTag> & H)
+
+	{
+		size_t Ydim = (ta==FflasNoTrans)?M:N;
+
+		if (F.isZero (beta))
+			fzero (F, Ydim, Y, incY);
+		else {
+			typename Field::Element betadivalpha;
+			FFLASFFPACK_check(!F.isZero(alpha));
+			F.div (betadivalpha, beta, alpha);
+			fscalin (F, Ydim, betadivalpha, Y, incY);
+		}
+		if (ta == FflasNoTrans)
+			for (size_t i = 0; i < Ydim; ++i)
+				F.addin (Y[i*incY], fdot(F, N, A+i*lda, 1, X, incX));
+		else
+			for (size_t i = 0; i < Ydim; ++i)
+				F.addin (Y[i*incY], fdot(F, M, A+i, lda, X, incX));
+		fscalin (F, Ydim, alpha, Y, incY);
+
+		return Y;
+	}
+}
+
+namespace FFLAS{
+	template<class Field>
+	inline typename Field::Element_ptr
+	fgemv (const Field& F, const FFLAS_TRANSPOSE ta,
+	       const size_t M, const size_t N,
+	       const typename Field::Element alpha,
+	       typename Field::ConstElement_ptr A, const size_t lda,
+	       typename Field::ConstElement_ptr X, const size_t incX,
+	       const typename Field::Element beta,
+	       typename Field::Element_ptr Y, const size_t incY,
+	       MMHelper<Field, MMHelperAlgo::Classic, ModeCategories::LazyTag> & H)
+	{
+		typedef MMHelper<Field, MMHelperAlgo::Classic, ModeCategories::LazyTag> HelperType;
+		typedef typename HelperType::DelayedField::Element DFElt;
+		typedef typename HelperType::DelayedField::Element_ptr DFElt_ptr;
+		typedef typename HelperType::DelayedField::ConstElement_ptr DFCElt_ptr;
+		DFElt alphadf=alpha, betadf=beta;
+		size_t Ydim = (ta==FflasNoTrans)?M:N;
+		size_t Xdim = (ta==FflasNoTrans)?N:M;
+		if (F.isMOne (alpha)) alphadf =  -F.one;
+		else {
+			alphadf = F.one;
+			if (! F.isOne( alpha)) {
+				// Compute y = A*x + beta/alpha.y, then y *= alpha
+				FFLASFFPACK_check(!F.isZero(alpha));
+				typename Field::Element betadalpha;
+				F.init(betadalpha);
+				F.div (betadalpha, beta, alpha);
+				betadf=betadalpha;
+			}
+		}
+        if (F.isMOne(betadf)) betadf = -F.one;
+        
+		size_t kmax = H.MaxDelayedDim (betadf);
+
+		if (kmax <=  Xdim/2 ){
+                        // Might as well reduce inputs
+                        if (H.Amin < H.FieldMin || H.Amax>H.FieldMax){
+				H.initA();
+				freduce_constoverride (F, M, N, A, lda);
+			}
+			if (H.Bmin < H.FieldMin || H.Bmax>H.FieldMax){
+				H.initB();
+				freduce_constoverride (F, Xdim, X, incX);
+			}
+			if (H.Cmin < H.FieldMin || H.Cmax>H.FieldMax){
+				H.initC();
+				freduce (F, Ydim, Y, incY);
+			}
+			kmax = H.MaxDelayedDim (betadf);
+		}
+
+		if (!kmax){
+			MMHelper<Field, MMHelperAlgo::Classic, ModeCategories::DefaultTag> HG(H);
+			H.initOut();
+			return fgemv (F, ta, M, N, alpha, A, lda, X, incX, beta, Y, incY, HG);
+		}
+		size_t k2 = std::min (Xdim, kmax);
+		size_t nblock = Xdim / kmax;
+		size_t remblock = Xdim % kmax;
+		if (!remblock) {
+			remblock = kmax;
+			--nblock;
+		}
+		size_t shiftA, M1, N1, Mi, Ni;
+		if (ta == FflasTrans) {
+			shiftA = k2*lda;
+			M1 = remblock;
+			Mi = k2;
+			Ni = N1 = N;
+		}else {
+			shiftA = k2;
+			Mi = M1 = M;
+			N1 = remblock;
+			Ni = k2;
+		}
+		MMHelper<typename associatedDelayedField<const Field>::field, MMHelperAlgo::Classic, ModeCategories::DefaultBoundedTag> Hfp(H);
+
+
+		fgemv (H.delayedField, ta, M1, N1, alphadf, (DFCElt_ptr)A+nblock*shiftA, lda,
+		       (DFCElt_ptr)X+nblock*k2*incX, incX, betadf, (DFElt_ptr)Y, incY, Hfp);
+
+		for (size_t i = 0; i < nblock; ++i) {
+			freduce (F, Ydim ,Y, incY);
+			Hfp.initC();
+			fgemv (H.delayedField, ta, Mi, Ni, alphadf, (DFCElt_ptr)A+i*shiftA, lda,
+			       (DFCElt_ptr)X+i*k2*incX, incX, F.one, (DFElt_ptr)Y, incY, Hfp);
+		}
+
+        if (!F.isOne(alpha) && !F.isMOne(alpha)){
+			DFElt al; F.convert(al, alpha);
+			if (al<0) al = -al;
+			if (std::max(-Hfp.Outmin, Hfp.Outmax) > Hfp.MaxStorableValue/al){
+				freduce (F, Ydim, Y, incY);
+				Hfp.initOut();
+			}
+			fscalin (H.delayedField, Ydim, alpha, (DFElt_ptr)Y, incY);
+			if (alpha>0){
+				H.Outmin = al*Hfp.Outmin;
+				H.Outmax = al*Hfp.Outmax;
+			} else {
+				H.Outmin = -al*Hfp.Outmax;
+				H.Outmax = -al*Hfp.Outmin;
+			}
+		}else {
+			H.Outmin = Hfp.Outmin;
+			H.Outmax = Hfp.Outmax;
+		}
+		return Y;
+	}
+}
+
+namespace FFLAS{
+	template<class Field>
+	inline typename Field::Element_ptr
+	fgemv (const Field& F, const FFLAS_TRANSPOSE ta,
+	       const size_t M, const size_t N,
+	       const typename Field::Element alpha,
+	       typename Field::ConstElement_ptr A, const size_t lda,
+	       typename Field::ConstElement_ptr X, const size_t incX,
+	       const typename Field::Element beta,
+	       typename Field::Element_ptr Y, const size_t incY)
+	{
+		if (!M) {return Y;}
+		size_t Ydim = (ta == FflasNoTrans)?M:N;
+		size_t Xdim = (ta == FflasNoTrans)?N:M;
+		if (!Xdim || F.isZero (alpha)){
+			fscalin(F, Ydim, beta, Y, incY);
+			return Y;
+		}
+		MMHelper<Field, MMHelperAlgo::Classic > HW (F, 0);
+		return 	fgemv (F, ta, M, N, alpha,
+			       FFPACK::fflas_const_cast<typename Field::Element_ptr>(A), lda,
+			       FFPACK::fflas_const_cast<typename Field::Element_ptr>(X), incX,
+			       beta, Y, incY, HW);
+	}
+}
+
+
+namespace FFLAS{
+	inline Givaro::ZRing<int64_t>::Element_ptr
+	fgemv (const Givaro::ZRing<int64_t>& F, const FFLAS_TRANSPOSE ta,
+	       const size_t M, const size_t N,
+	       const int64_t alpha,
+	       const int64_t* A, const size_t lda,
+	       const int64_t* X, const size_t incX,
+	       const int64_t beta,
+	       int64_t* Y, const size_t incY,
+	       MMHelper<Givaro::ZRing<int64_t>, MMHelperAlgo::Classic, ModeCategories::DefaultTag> & H)
+	{
+		FFLASFFPACK_check(lda);
+
+#if defined(__AVX2__) or defined(__AVX__) or defined(__SSE4_1__)
+		if (ta == FflasNoTrans)
+			igemm_ (FflasRowMajor, ta, FflasNoTrans,M,1,N,alpha,A,lda,X,incX,beta,Y,incY);
+		else
+			igemm_ (FflasRowMajor, ta, FflasNoTrans,N,1,M,alpha,A,lda,X,incX,beta,Y,incY);
+#else
+		if (ta == FflasNoTrans){
+			int64_t* Yi=Y;
+			for (size_t i=0;i<M;i++, Yi+=incY){
+				*Yi *= beta * *Yi;
+				const int64_t* Xj=X;
+				for (size_t j=0; j < N; j++, Xj += incX)
+					*Yi += alpha*A[i*lda+j] * *Xj;
 			}
 		} else {
-			if  (TransA == FflasNoTrans) {
-				if (F.isZero (beta))
-					for (size_t i = 0; i < M; ++i)
-						F.assign( *(Y+i*incY), F.zero);
-				else {
-					typename Field::Element betadivalpha;
-					F.div (betadivalpha, beta, alpha);
-					for (size_t i = 0; i < M; ++i)
-						F.mulin( *(Y+i*incY), betadivalpha);
-				}
-				for (size_t i = 0; i < M; ++i)
-					for (size_t j = 0; j < N; ++j)
-						F.axpyin (*(Y+i*incY), *(A+i*lda+j), *(X+j*incX));
-				if (! F.isOne(alpha))
-					for (size_t i = 0; i < M; ++i)
-						F.mulin (*(Y+i*incY), alpha);
-			} else {
-				if (F.isZero (beta))
-					for (size_t i = 0; i < N; ++i)
-						F.assign( *(Y+i*incY), F.zero);
-				else {
-					typename Field::Element betadivalpha;
-					F.div (betadivalpha, beta, alpha);
-					for (size_t i = 0; i < N; ++i)
-						F.mulin( *(Y+i*incY), betadivalpha);
-				}
-
-
-				for (size_t i = 0; i < M; ++i)
-					for (size_t j = 0; j < N; ++j){
-						F.axpyin (*(Y+j*incY), *(A+i*lda+j), *(X+i*incX));
-					}
-				if (! F.isOne(alpha))
-					for (size_t i = 0; i < N; ++i)
-						F.mulin (*(Y+i*incY), alpha);
+			int64_t* Yi=Y;
+			for (size_t i=0;i<N;i++, Yi+=incY){
+				*Yi *= beta * *Yi;
+				const int64_t* Xj=X;
+				for (size_t j=0; j < M; j++, Xj += incX)
+					*Yi += alpha*A[i+j*lda] * *Xj;
 			}
 		}
+#endif
+		return Y;
 	}
-
-	namespace Protected {
-
-		// MatVectProd: computes y <- alpha.op(A)*x +  beta.y.
-		// Assumes that the condition k(p-1)^2 <2^53 is satisfied
-		template<class Field>
-		inline void
-		MatVectProd (const Field& F, const FFLAS_TRANSPOSE TransA,
-			     const size_t M, const size_t N,
-			     const typename Field::Element alpha,
-			     const typename Field::Element * A, const size_t lda,
-			     const typename Field::Element * X, const size_t incX,
-			     const typename Field::Element beta,
-			     typename Field::Element * Y, const size_t incY)
-		{
-			typename Field::Element tmp;
-
-			size_t Xl, Yl;
-			if  (TransA == FflasNoTrans){Xl = N;Yl = M;}
-			else {Xl = M; Yl = N;}
-			double* Ad = new double[M*N];
-			double* Xd = new double[Xl];
-			double* Yd = new double[Yl];
-			double alphad, betad;
-
-			if (F.areEqual (F.mOne, alpha)){
-				alphad = -1.0;
-				F.convert (betad, beta);
-			} else {
-				if (! F.areEqual (F.one, alpha)){
-					// Compute C = A*B + beta/alpha.C
-					// and after C *= alpha
-					F.div (tmp, beta, alpha);
-					F.convert (betad, tmp);
-				} else
-					F.convert (betad, beta);
-				alphad = 1.0;
-			}
-			MatF2MatD (F, Ad, N, A, lda, M, N);
-
-			double *Xdi=Xd;
-			for (const typename Field::Element* Xi=X; Xi != X+Xl*incX; Xi+=incX, Xdi++)
-				F.convert (*(Xdi), *Xi);
-			double  *Ydi=Yd;
-			if (!F.isZero(beta))
-				for (typename Field::Element* Yi = Y; Yi != Y+Yl*incY; Yi+=incY, Ydi++)
-					F.convert (*(Ydi), *Yi);
-
-			cblas_dgemv (CblasRowMajor, (CBLAS_TRANSPOSE) TransA, (int)M, (int)N, alphad,
-				     Ad, (int)N, Xd, 1, betad, Yd, 1);
-
-			Ydi=Yd;
-			for  (typename Field::Element* Yi = Y; Yi != Y+Yl*incY; Yi+=incY, Ydi++)
-				F.init (*Yi, *(Ydi));
-
-			if  (!F.areEqual (F.one, alpha) && !F.areEqual (F.mOne, alpha)){
-				// Fix-up: compute Y *= alpha
-				for (typename Field::Element* Yi = Y; Yi != Y+Yl*incY; Yi += incY)
-					F.mulin (*Yi , alpha);
-			}
-			delete[] Ad;
-			delete[] Xd;
-			delete[] Yd;
-		}
-
-
-		template<>
-		inline void MatVectProd (const  FFPACK:: ModularBalanced<double>& F,
-					 const FFLAS_TRANSPOSE TransA,
-					 const size_t M, const size_t N,
-					 const double alpha,
-					 const double * A, const size_t lda,
-					 const double * X, const size_t incX,
-					 const double beta,
-					 double * Y, const size_t incY)
-		{
-
-			double _alpha, _beta;
-			if (F.areEqual (F.mOne, beta)) _beta = -1.0;
-			else _beta = beta;
-
-			if (F.areEqual (F.mOne, alpha)) _alpha = -1.0;
-			else{
-				_alpha = 1.0;
-				if (! F.areEqual (F.one, alpha))
-					// Compute y = A*x + beta/alpha.y
-					// and after y *= alpha
-					F.divin (_beta, alpha);
-			}
-
-			cblas_dgemv (CblasRowMajor, (CBLAS_TRANSPOSE) TransA, (int)M, (int)N,
-				     _alpha, A, (int)lda, X, (int)incX, _beta, Y, (int)incY);
-
-			for  (double * Yi = Y; Yi != Y+((TransA == FflasNoTrans)?M:N)*incY; Yi+=incY)
-				F.init (*Yi, *Yi);
-
-			if ( (!F.areEqual (F.one, alpha)) && (!F.areEqual (F.mOne, alpha))){
-				// Fix-up: compute y *= alpha
-				for (double* Yi = Y; Yi != Y+((TransA == FflasNoTrans)?M:N)*incY; Yi += incY)
-					F.mulin (*Yi , alpha);
-			}
-		}
-
-		template<>
-		inline void MatVectProd (const  FFPACK:: ModularBalanced<float>& F,
-					 const FFLAS_TRANSPOSE TransA,
-					 const size_t M, const size_t N,
-					 const float alpha,
-					 const float * A, const size_t lda,
-					 const float * X, const size_t incX,
-					 const float beta,
-					 float * Y, const size_t incY)
-		{
-
-			float _alpha, _beta;
-			if  (F.areEqual (F.mOne, beta)) _beta = -1.0;
-			else _beta = beta;
-
-			if (F.areEqual (F.mOne, alpha)) _alpha = -1.0;
-			else{
-				_alpha = 1.0;
-				if (! F.areEqual (F.one, alpha)){
-					// Compute y = A*x + beta/alpha.y
-					// and after y *= alpha
-					F.divin (_beta, alpha);
-				}
-			}
-			cblas_sgemv (CblasRowMajor, (CBLAS_TRANSPOSE) TransA, (int)M, (int)N,
-				     _alpha, A, (int)lda, X, (int)incX, _beta, Y, (int)incY);
-			for  (float * Yi = Y; Yi != Y+((TransA == FflasNoTrans)?M:N)*incY; Yi+=incY)
-				F.init (*Yi, *Yi);
-			if ( (!F.areEqual (F.one, alpha)) && (!F.areEqual (F.mOne, alpha))){
-				// Fix-up: compute y *= alpha
-				for (float* Yi = Y; Yi != Y+((TransA == FflasNoTrans)?M:N)*incY; Yi += incY)
-					F.mulin (*Yi , alpha);
-			}
-		}
-
-		template<>
-		inline void MatVectProd (const  FFPACK:: Modular<double>& F,
-					 const FFLAS_TRANSPOSE TransA,
-					 const size_t M, const size_t N,
-					 const double alpha,
-					 const double * A, const size_t lda,
-					 const double * X, const size_t incX,
-					 const double beta,
-					 double * Y, const size_t incY)
-		{
-
-			double _alpha, _beta;
-			if (F.areEqual (F.mOne, beta)) _beta = -1.0;
-			else _beta = beta;
-
-			if (F.areEqual (F.mOne, alpha)) _alpha = -1.0;
-			else{
-				_alpha = 1.0;
-				if (! F.areEqual (F.one, alpha))
-					// Compute y = A*x + beta/alpha.y
-					// and after y *= alpha
-					F.divin (_beta, alpha);
-			}
-
-			cblas_dgemv (CblasRowMajor, (CBLAS_TRANSPOSE) TransA, (int)M, (int)N,
-				     _alpha, A, (int)lda, X, (int)incX, _beta, Y, (int)incY);
-
-			for  (double * Yi = Y; Yi != Y+((TransA == FflasNoTrans)?M:N)*incY; Yi+=incY)
-				F.init (*Yi, *Yi);
-
-			if ( (!F.areEqual (F.one, alpha)) && (!F.areEqual (F.mOne, alpha))){
-				// Fix-up: compute y *= alpha
-				for (double* Yi = Y; Yi != Y+((TransA == FflasNoTrans)?M:N)*incY; Yi += incY)
-					F.mulin (*Yi , alpha);
-			}
-		}
-
-		template<>
-		inline void MatVectProd (const  FFPACK:: Modular<float>& F,
-					 const FFLAS_TRANSPOSE TransA,
-					 const size_t M, const size_t N,
-					 const float alpha,
-					 const float * A, const size_t lda,
-					 const float * X, const size_t incX,
-					 const float beta,
-					 float * Y, const size_t incY)
-		{
-
-			float _alpha, _beta;
-			if  (F.areEqual (F.mOne, beta)) _beta = -1.0;
-			else _beta = beta;
-
-			if (F.areEqual (F.mOne, alpha)) _alpha = -1.0;
-			else{
-				_alpha = 1.0;
-				if (! F.areEqual (F.one, alpha)){
-					// Compute y = A*x + beta/alpha.y
-					// and after y *= alpha
-					F.divin (_beta, alpha);
-				}
-			}
-			cblas_sgemv (CblasRowMajor, (CBLAS_TRANSPOSE) TransA, (int)M, (int)N,
-				     _alpha, A, (int)lda, X, (int)incX, _beta, Y, (int)incY);
-			for  (float * Yi = Y; Yi != Y+((TransA == FflasNoTrans)?M:N)*incY; Yi+=incY)
-				F.init (*Yi, *Yi);
-			if ( (!F.areEqual (F.one, alpha)) && (!F.areEqual (F.mOne, alpha))){
-				// Fix-up: compute y *= alpha
-				for (float* Yi = Y; Yi != Y+((TransA == FflasNoTrans)?M:N)*incY; Yi += incY)
-					F.mulin (*Yi , alpha);
-			}
-		}
-
-	} // Protected
-
-	template<>
-	inline void
-	fgemv (const DoubleDomain& , const FFLAS_TRANSPOSE TransA,
+	inline Givaro::DoubleDomain::Element_ptr
+	fgemv (const Givaro::DoubleDomain& F, const FFLAS_TRANSPOSE ta,
 	       const size_t M, const size_t N,
-	       const DoubleDomain::Element  alpha,
-	       const DoubleDomain::Element * A, const size_t lda,
-	       const DoubleDomain::Element * X, const size_t incX,
-	       const DoubleDomain::Element beta,
-	       DoubleDomain::Element * Y, const size_t incY)
+	       const Givaro::DoubleDomain::Element alpha,
+	       const Givaro::DoubleDomain::ConstElement_ptr A, const size_t lda,
+	       const Givaro::DoubleDomain::ConstElement_ptr X, const size_t incX,
+	       const Givaro::DoubleDomain::Element beta,
+	       Givaro::DoubleDomain::Element_ptr Y, const size_t incY,
+	       MMHelper<Givaro::DoubleDomain, MMHelperAlgo::Classic, ModeCategories::DefaultTag> & H)
 	{
-		cblas_dgemv (CblasRowMajor, (CBLAS_TRANSPOSE) TransA, (int)M, (int)N,
-			     alpha, A, (int)lda, X, (int)incX, beta, Y, (int)incY);
+		FFLASFFPACK_check(lda);
+
+		cblas_dgemv (CblasRowMajor, (CBLAS_TRANSPOSE) ta,
+			     (int)M, (int)N, (Givaro::DoubleDomain::Element) alpha,
+			     A, (int)lda, X, (int)incX, (Givaro::DoubleDomain::Element) beta, Y, (int)incY);
+		return Y;
 	}
 
-	template<>
-	inline void
-	fgemv (const FloatDomain& , const FFLAS_TRANSPOSE TransA,
+	template <class Field>
+	inline typename Field::Element_ptr
+	fgemv (const Field& F, const FFLAS_TRANSPOSE ta,
 	       const size_t M, const size_t N,
-	       const FloatDomain::Element  alpha,
-	       const FloatDomain::Element * A, const size_t lda,
-	       const FloatDomain::Element * X, const size_t incX,
-	       const FloatDomain::Element beta,
-	       FloatDomain::Element * Y, const size_t incY)
+	       const typename Field::Element alpha,
+	       const typename Field::ConstElement_ptr A, const size_t lda,
+	       const typename Field::ConstElement_ptr X, const size_t incX,
+	       const typename Field::Element beta,
+	       typename Field::Element_ptr Y, const size_t incY,
+	       MMHelper<Field, MMHelperAlgo::Classic, ModeCategories::DefaultBoundedTag> & H)
 	{
-		cblas_sgemv (CblasRowMajor, (CBLAS_TRANSPOSE) TransA, (int)M, (int)N,
-			     alpha, A, (int)lda, X, (int)incX, beta, Y, (int)incY);
+                H.setOutBounds((ta ==FflasNoTrans)?N:M, alpha, beta);
+		MMHelper<Field, MMHelperAlgo::Classic, ModeCategories::DefaultTag> Hb(F,0);
+
+		return fgemv(F, ta, M, N, alpha, A, lda, X, incX, beta, Y, incY, Hb);
 	}
-} // FFLAS
+
+	inline Givaro::FloatDomain::Element_ptr
+	fgemv (const Givaro::FloatDomain& F, const FFLAS_TRANSPOSE ta,
+	       const size_t M, const size_t N,
+	       const Givaro::FloatDomain::Element alpha,
+	       const Givaro::FloatDomain::ConstElement_ptr A, const size_t lda,
+	       const Givaro::FloatDomain::ConstElement_ptr X, const size_t incX,
+	       const Givaro::FloatDomain::Element beta,
+	       Givaro::FloatDomain::Element_ptr Y, const size_t incY,
+	       MMHelper<Givaro::FloatDomain, MMHelperAlgo::Classic, ModeCategories::DefaultTag> & H)
+	{
+		FFLASFFPACK_check(lda);
+
+		cblas_sgemv (CblasRowMajor, (CBLAS_TRANSPOSE) ta,
+			     (int)M, (int)N, (Givaro::FloatDomain::Element) alpha,
+			     A, (int)lda, X, (int)incX, (Givaro::FloatDomain::Element) beta, Y, (int)incY);
+		return Y;
+	}
+
+}
+
 #endif //  __FFLASFFPACK_fgemv_INL

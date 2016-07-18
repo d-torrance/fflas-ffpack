@@ -1,5 +1,5 @@
 # Copyright (c) 2011 FFLAS-FFPACK
-# written by BB <bboyer@imag.fr>
+# written by Brice Boyer (briceboyer) <boyer.brice@gmail.com>
 # adapted from LinBox configuration
 #
 # ========LICENCE========
@@ -24,6 +24,8 @@
 
 pkgincludesubdir=$(pkgincludedir)/ffpack
 
+multiprecision= ffpack_ludivine_mp.inl ffpack_pluq_mp.inl
+
 pkgincludesub_HEADERS=        \
 		ffpack_charpoly_danilevski.inl        \
 		ffpack_charpoly.inl                   \
@@ -34,7 +36,19 @@ pkgincludesub_HEADERS=        \
 		ffpack_charpoly_kglu.inl              \
 		ffpack_echelonforms.inl               \
 		ffpack_ludivine.inl                   \
+		ffpack_pluq.inl                       \
+		ffpack_ppluq.inl \
 		ffpack_frobenius.inl                  \
 		ffpack_minpoly_construct.inl          \
-		ffpack_minpoly.inl
+		ffpack_minpoly.inl \
+		ffpack.inl\
+		ffpack_invert.inl\
+		ffpack_fgesv.inl\
+		ffpack_fgetrs.inl\
+		ffpack_permutation.inl\
+		ffpack_ftrtr.inl\
+		ffpack_rankprofiles.inl\
+		$(multiprecision)
 
+
+EXTRA_DIST=ffpack.doxy

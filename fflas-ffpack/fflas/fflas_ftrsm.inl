@@ -6,20 +6,20 @@
  *
  * Written by Clement Pernet <Clement.Pernet@imag.fr>
  *
- * 
+ *
  * ========LICENCE========
  * This file is part of the library FFLAS-FFPACK.
- * 
+ *
  * FFLAS-FFPACK is free software: you can redistribute it and/or modify
  * it under the terms of the  GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
@@ -32,11 +32,11 @@
 
 
 namespace FFLAS {
+
 	//---------------------------------------------------------------------
 	// ftrsm: TRiangular System solve with matrix
 	// Computes  B <- alpha.op(A^-1).B,  B <- alpha.B.op(A^-1)
 	// B is M*N, A is M*M if Side==FflasLeft, N*N if Side==FflasRight
-	// Warning : unsafe with Trans ==  FflasTrans (debugging in progress)
 	//---------------------------------------------------------------------
 	template<class Field>
 	inline void
@@ -46,69 +46,135 @@ namespace FFLAS {
 	       const FFLAS_DIAG Diag,
 	       const size_t M, const size_t N,
 	       const typename Field::Element alpha,
-	       typename Field::Element * A, const size_t lda,
-	       typename Field::Element * B, const size_t ldb)
+#ifdef __FFLAS__TRSM_READONLY
+	       typename Field::ConstElement_ptr
+#else
+	       typename Field::Element_ptr
+#endif
+	       A, const size_t lda,
+	       typename Field::Element_ptr B, const size_t ldb)
+	{
+		ParSeqHelper::Sequential PSH;
+		TRSMHelper<StructureHelper::Recursive, ParSeqHelper::Sequential> H(PSH);
+		ftrsm(F, Side, Uplo, TransA, Diag, M, N, alpha, A, lda, B, ldb, H);
+	}
+
+	template<class Field>
+	inline void
+	ftrsm (const Field& F, const FFLAS_SIDE Side,
+	       const FFLAS_UPLO Uplo,
+	       const FFLAS_TRANSPOSE TransA,
+	       const FFLAS_DIAG Diag,
+	       const size_t M, const size_t N,
+	       const typename Field::Element alpha,
+#ifdef __FFLAS__TRSM_READONLY
+	       typename Field::ConstElement_ptr
+#else
+	       typename Field::Element_ptr
+#endif
+	       A, const size_t lda,
+	       typename Field::Element_ptr B, const size_t ldb,
+	       const ParSeqHelper::Sequential& PSH)
+	{
+		TRSMHelper<StructureHelper::Recursive, ParSeqHelper::Sequential> H(PSH);
+		ftrsm(F, Side, Uplo, TransA, Diag, M, N, alpha, A, lda, B, ldb, H);
+	}
+
+	template<class Field, class Cut, class Param>
+	inline void
+	ftrsm (const Field& F, const FFLAS_SIDE Side,
+	       const FFLAS_UPLO Uplo,
+	       const FFLAS_TRANSPOSE TransA,
+	       const FFLAS_DIAG Diag,
+	       const size_t M, const size_t N,
+	       const typename Field::Element alpha,
+#ifdef __FFLAS__TRSM_READONLY
+	       typename Field::ConstElement_ptr
+#else
+	       typename Field::Element_ptr
+#endif
+	       A, const size_t lda,
+	       typename Field::Element_ptr B, const size_t ldb,
+	       const ParSeqHelper::Parallel<Cut,Param>& PSH)
+	{
+		TRSMHelper<StructureHelper::Iterative, ParSeqHelper::Parallel<Cut,Param> > H(PSH);
+		ftrsm(F, Side, Uplo, TransA, Diag, M, N, alpha, A, lda, B, ldb, H);
+	}
+
+	template<class Field, class ParSeqTrait=ParSeqHelper::Sequential>
+	inline void
+	ftrsm (const Field& F, const FFLAS_SIDE Side,
+	       const FFLAS_UPLO Uplo,
+	       const FFLAS_TRANSPOSE TransA,
+	       const FFLAS_DIAG Diag,
+	       const size_t M, const size_t N,
+	       const typename Field::Element alpha,
+#ifdef __FFLAS__TRSM_READONLY
+	       typename Field::ConstElement_ptr
+#else
+	       typename Field::Element_ptr
+#endif
+	       A, const size_t lda,
+	       typename Field::Element_ptr B, const size_t ldb,
+	       TRSMHelper<StructureHelper::Recursive, ParSeqTrait> & H)
 	{
 		if (!M || !N ) return;
-
 
 		if ( Side==FflasLeft ){
 			if ( Uplo==FflasUpper){
 				if (TransA == FflasNoTrans){
 					if (Diag == FflasUnit)
-						Protected::ftrsmLeftUpperNoTransUnit<typename Field::Element> ()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmLeftUpperNoTransUnit<typename Field::Element> ()(F,M,N,A,lda,B,ldb,H);
 					else
-						Protected::ftrsmLeftUpperNoTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmLeftUpperNoTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 				} else {
 					if (Diag == FflasUnit)
-						Protected::ftrsmLeftUpperTransUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmLeftUpperTransUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 					else
-						Protected::ftrsmLeftUpperTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmLeftUpperTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 				}
 			} else {
 				if (TransA == FflasNoTrans){
 					if (Diag == FflasUnit)
-						Protected::ftrsmLeftLowerNoTransUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmLeftLowerNoTransUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 					else
-						Protected::ftrsmLeftLowerNoTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmLeftLowerNoTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 				} else {
 					if (Diag == FflasUnit)
-						Protected::ftrsmLeftLowerTransUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmLeftLowerTransUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 					else
-						Protected::ftrsmLeftLowerTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmLeftLowerTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 				}
 			}
 		} else {
 			if ( Uplo == FflasUpper){
 				if (TransA == FflasNoTrans){
 					if (Diag == FflasUnit)
-						Protected::ftrsmRightUpperNoTransUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmRightUpperNoTransUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 					else
-						Protected::ftrsmRightUpperNoTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmRightUpperNoTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 				} else {
 					if (Diag == FflasUnit)
-						Protected::ftrsmRightUpperTransUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmRightUpperTransUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 					else
-						Protected::ftrsmRightUpperTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmRightUpperTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 				}
 			} else {
 				if (TransA == FflasNoTrans){
 					if (Diag == FflasUnit)
-						Protected::ftrsmRightLowerNoTransUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmRightLowerNoTransUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 					else
-						Protected::ftrsmRightLowerNoTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmRightLowerNoTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 				} else {
 					if (Diag == FflasUnit)
-						Protected::ftrsmRightLowerTransUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmRightLowerTransUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 					else
-						Protected::ftrsmRightLowerTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb);
+						Protected::ftrsmRightLowerTransNonUnit<typename Field::Element>()(F,M,N,A,lda,B,ldb,H);
 				}
 			}
 		}
 		if (!F.isOne(alpha))
-			for (size_t i=0; i< M; ++i)
-				for (size_t j=0; j<N; ++j)
-					F.mulin(*(B+i*ldb+j),alpha);
+			fscalin(F,M,N,alpha,B,ldb);
 
 	}
 

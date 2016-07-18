@@ -6,30 +6,28 @@
  *
  * Written by Clement Pernet <Clement.Pernet@imag.fr>
  *
- * 
+ *
  * ========LICENCE========
  * This file is part of the library FFLAS-FFPACK.
- * 
+ *
  * FFLAS-FFPACK is free software: you can redistribute it and/or modify
  * it under the terms of the  GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * ========LICENCE========
  *.
  */
-
-#ifndef MIN
-#define MIN(a,b) (a<b)?a:b
-#endif
+#ifndef __FFLASFFPACK_ffpack_charpoly_danilveski_INL
+#define __FFLASFFPACK_ffpack_charpoly_danilveski_INL
 
 namespace FFPACK {
 
@@ -41,15 +39,15 @@ namespace FFPACK {
 template <class Field, class Polynomial>
 std::list<Polynomial>&
 Danilevski (const Field& F, std::list<Polynomial>& charp,
-			    const size_t N, typename Field::Element * A,
+			    const size_t N, typename Field::Element_ptr A,
 			    const size_t lda)
 {
 	charp.clear();
 	size_t dtot=0;
-	typename Field::Element *pivot,*e,*u1,invp;
+	typename Field::Element_ptr pivot,e,u1;
+	typename Field::Element invp;
 	for (size_t k=0; k<N; ++k){
 		size_t i = k+1;
-		size_t d;
 		e = pivot = A + (k+1) * lda + k; // coef
 		while ((i<N) && F.isZero(*e)) { e += lda; i++; }
 		if (i < N){
@@ -58,8 +56,8 @@ Danilevski (const Field& F, std::list<Polynomial>& charp,
 				FFLAS::fswap (F, N, A+i, lda, A+k+1, lda);
 			}
 			F.inv (invp, *pivot);
-			FFLAS::fscal (F, N-k-1, invp, pivot+1, 1);
-			FFLAS::fscal (F, N-dtot, *pivot, A+dtot*lda+k+1, lda);
+			FFLAS::fscalin (F, N-k-1, invp, pivot+1, 1);
+			FFLAS::fscalin (F, N-dtot, *pivot, A+dtot*lda+k+1, lda);
 			// X <- X - uw
 			FFLAS::fger (F, k + 1-dtot, N - k -1, F.mOne,
 			      A + dtot*lda + k, lda, pivot+1, 1,
@@ -82,8 +80,9 @@ Danilevski (const Field& F, std::list<Polynomial>& charp,
 			}
 		}
 		if (i==N){// completed one companion block
+		size_t d;
 			d = k+1-dtot;
-			typename Field::Element *Ai = A+k+dtot*lda;
+			typename Field::Element_ptr Ai = A+k+dtot*lda;
 			Polynomial * P = new Polynomial(d+1);
 			for (i = 0; i < d; ++i){
 				F.neg (P->operator[](i), *(Ai+i*lda));
@@ -97,3 +96,5 @@ Danilevski (const Field& F, std::list<Polynomial>& charp,
 }
 
 } // FFPACK
+
+#endif // __FFLASFFPACK_ffpack_charpoly_danilveski_INL

@@ -32,10 +32,13 @@
 
 #ifndef __FFLASFFPACK_util_debug_H
 #define __FFLASFFPACK_util_debug_H
+#include <fflas-ffpack/fflas-ffpack-config.h>
 
+#include <iostream>
 #include <sstream>
+#include <cmath>
 
-#include "fflas-ffpack/fflas-ffpack-configuration.h"
+#include "fflas-ffpack/fflas-ffpack-config.h"
 
 
 #ifdef __FFLASFFPACK_HAVE_STDINT_H
@@ -43,52 +46,38 @@
 #define __STDC_LIMIT_MACROS
 #endif
 #include <stdint.h>
-
-#ifndef INT64_MAX
-#warning "somebody nasty previously included <stdint.h> without __STDC_LIMIT_MACROS :)"
 #include <limits>
+
+// If somebody nasty previously included <stdint.h> without __STDC_LIMIT_MACROS :)
+#ifndef INT64_MAX
 #define INT64_MAX std::numeric_limits<int64_t>::max()
 #endif
 
 #ifndef UINT64_MAX
-#warning "somebody nasty previously included <stdint.h> without __STDC_LIMIT_MACROS :)"
-#include <limits>
 #define UINT64_MAX std::numeric_limits<uint64_t>::max()
 #endif
 
 #ifndef INT32_MAX
-#warning "somebody nasty previously included <stdint.h> without __STDC_LIMIT_MACROS :)"
-#include <limits>
 #define INT32_MAX std::numeric_limits<int32_t>::max()
 #endif
 
 #ifndef UINT32_MAX
-#warning "somebody nasty previously included <stdint.h> without __STDC_LIMIT_MACROS :)"
-#include <limits>
 #define UINT32_MAX std::numeric_limits<uint32_t>::max()
 #endif
 
 #ifndef INT16_MAX
-#warning "somebody nasty previously included <stdint.h> without __STDC_LIMIT_MACROS :)"
-#include <limits>
 #define INT16_MAX std::numeric_limits<int16_t>::max()
 #endif
 
 #ifndef UINT16_MAX
-#warning "somebody nasty previously included <stdint.h> without __STDC_LIMIT_MACROS :)"
-#include <limits>
 #define UINT16_MAX std::numeric_limits<uint16_t>::max()
 #endif
 
 #ifndef INT8_MAX
-#warning "somebody nasty previously included <stdint.h> without __STDC_LIMIT_MACROS :)"
-#include <limits>
 #define INT8_MAX std::numeric_limits<int8_t>::max()
 #endif
 
 #ifndef UINT8_MAX
-#warning "somebody nasty previously included <stdint.h> without __STDC_LIMIT_MACROS :)"
-#include <limits>
 #define UINT8_MAX std::numeric_limits<uint8_t>::max()
 #endif
 
@@ -96,41 +85,51 @@
 #error "you need intXX_t types"
 #endif
 
-#ifndef DEBUG
-#define FFLASFFPACK_check(check) ((void) 0)
-#else
+#ifndef NDEBUG
+#include <stdexcept>
 #define FFLASFFPACK_check(check) \
 if (!(check)) {\
-throw FFPACK::Failure (__func__, __FILE__, __LINE__, #check); /*BB : should work on non gnu compilers too */ \
+FFPACK::failure()(__func__, __FILE__, __LINE__, #check); \
+throw std::runtime_error(#check); \
 }
+#define FFLASFFPACK_abort(msg) \
+{\
+FFPACK::failure()(__func__, __FILE__, __LINE__, msg); \
+throw std::runtime_error(msg); \
+}
+#else
+#define FFLASFFPACK_check(check) ((void) 0)
+#define FFLASFFPACK_abort(mst) ((void) 0)
 #endif
 
 
 
 namespace FFPACK {
 
-
 	/*!  A precondtion failed.
 	 * @ingroup util
 	 * The \c throw mechanism is usually used here as in
 	 \code
 	 if (!check)
-	 throw(Failure(__func__,__LINE__,"this check just failed");
+	 failure()(__func__,__LINE__,"this check just failed");
 	 \endcode
 	 * The parameters of the constructor help debugging.
 	 */
 	class Failure {
 	protected:
-		static std::ostream *_errorStream;
+		std::ostream *_errorStream;
 
 	public:
+	    
+	    Failure() {}
+	
 		/*! @internal
 		 * A precondtion failed.
 		 * @param function usually \c __func__, the function that threw the error
 		 * @param line     usually \c __LINE__, the line where it happened
 		 * @param check    a string telling what failed.
 		 */
-		Failure (const char *function, int line, const char *check)
+		void operator() (const char *function, int line, const char *check)
 		{
 			if (_errorStream == (std::ostream *) 0)
 				_errorStream = &std::cerr;
@@ -149,7 +148,7 @@ namespace FFPACK {
 		 * @param line     usually \c __LINE__, the line where it happened
 		 * @param check    a string telling what failed.
 		 */
-		Failure (const char* function, const char *file, int line, const char *check)
+		void operator() (const char* function, const char *file, int line, const char *check)
 		{
 			if (_errorStream == (std::ostream *) 0)
 				_errorStream = &std::cerr;
@@ -159,7 +158,7 @@ namespace FFPACK {
 			(*_errorStream) << "Precondition not met:" << check << std::endl;
 		}
 
-		static void setErrorStream (std::ostream &stream);
+		void setErrorStream (std::ostream &stream);
 
 		/*! @internal overload the virtual print of LinboxError.
 		 * @param o output stream
@@ -173,48 +172,25 @@ namespace FFPACK {
 		}
 	};
 
-#if 0
-	/*! @internal A function is "not implemented yet(tm)".
-	 * where, why ?
-	 */
-	class NotImplementedYet {
-	protected:
-		static std::ostream *_errorStream;
+    
+    inline Failure& failure() {
+        static Failure failure_internal;
+        return failure_internal;
+    }
 
-	public:
-		/*! @internal
-		 * A precondtion failed.
-		 * The parameter help debugging. This is not much different from the previous
-		 * except we can digg faster in the file where the exception was triggered.
-		 * @param function usually \c __func__, the function that threw the error
-		 * @param file     usually \c __FILE__, the file where this function is
-		 * @param line     usually \c __LINE__, the line where it happened
-		 * @param why      by default, lazy people don't provide an explanation.
-		 */
-		NotImplementedYet() {}
+	template<class T>
+	inline bool isOdd (const T & a) {
+		return (a%2);
+	}
 
-		NotImplementedYet(const char * function,
-				  const char* file,
-				  int line,
-				  const char * why='\0')
-		{
-			if (_errorStream == (std::ostream *) 0)
-				_errorStream = &std::cerr;
+	inline bool isOdd(const float &a) {
+		return (bool)(int)fmodf(a,2.f);
+	}
 
-			(*_errorStream) << std::endl << std::endl;
-			(*_errorStream) << "ERROR (at " << function << " in " << file << ':' <<  line << "): " << std::endl;
-			(*_errorStream) << " This function is not implemented yet" ;
-			if (why)
-				(*_errorStream)	<< " (" << why << ")" <<std::endl;
-			else
-				(*_errorStream)	<<  "." << std::endl;
+	inline bool isOdd(const double &a) {
+		return (bool)(int)fmod(a,2.);
+	}
 
-		}
-	};
-
-#endif
-
-	std::ostream *Failure::_errorStream;
 } // FFPACK
 
 #endif // __FFLASFFPACK_util_debug_H

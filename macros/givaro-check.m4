@@ -1,13 +1,7 @@
 dnl Check for GIVARO
-dnl Bradford Hovinen, 2001-06-13
-dnl Modified by Pascal Giorgi, 2003-12-03
-dnl Inspired by gnome-bonobo-check.m4 by Miguel de Icaza, 99-04-12
-dnl Stolen from Chris Lahey       99-2-5
-dnl stolen from Manish Singh again
-dnl stolen back from Frank Belew
-dnl stolen from Manish Singh
-dnl Shamelessly stolen from Owen Taylor
-dnl  Copyright (c) 2011 FFLAS-FFPACK
+dnl Copyright (c) the Givaro group
+dnl This file is part of FFLAS-FFPACK
+
 dnl ========LICENCE========
 dnl This file is part of the library FFLAS-FFPACK.
 dnl
@@ -29,11 +23,14 @@ dnl/
 
 
 
-dnl LB_CHECK_GIVARO ([MINIMUM-VERSION [, ACTION-IF-FOUND [, ACTION-IF-NOT-FOUND]]])
-dnl
-dnl Test for Givaro and define GIVARO_CFLAGS and GIVARO_LIBS
+dnl adapted from LinBox by BB.
 
-AC_DEFUN([LB_CHECK_GIVARO],
+dnl FF_CHECK_GIVARO ([MINIMUM-VERSION [, ACTION-IF-FOUND [, ACTION-IF-NOT-FOUND]]])
+dnl
+dnl Tests for Givaro and define GIVARO_CFLAGS and GIVARO_LIBS
+dnl Defines HAVE_GIVARO
+
+AC_DEFUN([FF_CHECK_GIVARO],
 [
 
 AC_ARG_WITH(givaro,
@@ -55,13 +52,15 @@ dnl -------------- dnl
 dnl GIVARO VERSION dnl
 dnl -------------- dnl
 
-version_min=30700
-version_max=30800
+dnl As we need Integer and Modular, should be updated on each interface changes
+version_min=40001
+version_max=40002
 
 dnl Check for existence
 
 BACKUP_CXXFLAGS=${CXXFLAGS}
 BACKUP_LIBS=${LIBS}
+saved_LD_RUN_PATH="$LD_RUN_PATH"
 
 AC_MSG_CHECKING(for GIVARO >= $version_min and < $version_max)
 
@@ -69,23 +68,21 @@ for GIVARO_HOME in ${GIVARO_HOME_PATH}
  do
 if test -r "$GIVARO_HOME/include/givaro/givconfig.h"; then
 
-	if test "x$GIVARO_HOME" != "x/usr" -a "x$GIVARO_HOME" != "x/usr/local"; then
-		GIVARO_CFLAGS="-I${GIVARO_HOME}/include"
-		GIVARO_LIBS="-L${GIVARO_HOME}/lib -lgivaro"
-	else
-		GIVARO_CFLAGS=
-		GIVARO_LIBS="-lgivaro"
-	fi
-	CXXFLAGS="${BACKUP_CXXFLAGS} ${GIVARO_CFLAGS} ${GMP_CFLAGS}"
-	LIBS="${BACKUP_LIBS} ${GIVARO_LIBS} ${GMP_LIBS}"
-
+	# Givaro Libs + CFlags contain GMP info - AB 2014-12-12
+	GIVARO_LIBS=`$GIVARO_HOME/bin/givaro-config --libs`
+	GIVARO_CFLAGS=`$GIVARO_HOME/bin/givaro-config --cflags`
+	givaro_lib_path=`$GIVARO_HOME/bin/givaro-config --prefix`/lib
+	CXXFLAGS="${BACKUP_CXXFLAGS} ${GIVARO_CFLAGS}"
+	LIBS="${BACKUP_LIBS} ${GIVARO_LIBS}"
+	LD_RUN_PATH="${LD_RUN_PATH:+$LD_RUN_PATH$PATH_SEPARATOR}$givaro_lib_path"
+	export LD_RUN_PATH
 	AC_TRY_LINK(
 	[#include <givaro/givinteger.h>],
 	[Givaro::Integer a;],
 	[
 	AC_TRY_RUN(
 	[#include <givaro/givconfig.h>
-         int main () { if (GIVARO_VERSION < $version_min || GIVARO_VERSION >= $version_max || GIVARO_VERSION>0x030000) return -1; else return 0; /* old version of Givaro are defined as hexa 0x03yyzz*/ }
+	 int main () { if (GIVARO_VERSION >= $version_min && GIVARO_VERSION < $version_max) return 0; else return -1; /* old version of Givaro are defined as hexa 0x03yyzz*/ }
 	],[
 	givaro_found="yes"
 	break
@@ -101,10 +98,11 @@ if test -r "$GIVARO_HOME/include/givaro/givconfig.h"; then
 	])
 	],
 	[
-	givaro_found="no"
+	givaro_found="yes"
 	givaro_checked="$checked $GIVARO_HOME"
-	unset GIVARO_CFLAGS
-	unset GIVARO_LIBS
+#unset GIVARO_CFLAGS
+#unset GIVARO_LIBS
+	break
 
 	])
 else
@@ -115,8 +113,10 @@ done
 if test "x$givaro_found" = "xyes" ; then
 	AC_SUBST(GIVARO_CFLAGS)
 	AC_SUBST(GIVARO_LIBS)
+	dnl  echo $GIVARO_CFLAGS $GIVARO_LIBS
 	AC_DEFINE(HAVE_GIVARO,1,[Define if GIVARO is installed])
 	HAVE_GIVARO=yes
+	
 	if test "x$givaro_cross" != "xyes"; then
 		AC_MSG_RESULT(found)
 	else
@@ -124,6 +124,7 @@ if test "x$givaro_found" = "xyes" ; then
 		echo "WARNING: You appear to be cross compiling, so there is no way to determine"
 		echo "whether your GIVARO version is new enough. I am assuming it is."
 	fi
+	
 	ifelse([$2], , :, [$2])
 elif test -n "$givaro_problem"; then
 	AC_MSG_RESULT(problem)
@@ -134,10 +135,13 @@ elif test "x$givaro_found" = "xno" ; then
 	ifelse([$3], , :, [$3])
 fi
 
-AM_CONDITIONAL(LINBOX_HAVE_GIVARO, test "x$HAVE_GIVARO" = "xyes")
+AM_CONDITIONAL(FFLASFFPACK_HAVE_GIVARO, test "x$HAVE_GIVARO" = "xyes")
 
 CXXFLAGS=${BACKUP_CXXFLAGS}
 LIBS=${BACKUP_LIBS}
+LD_RUN_PATH="$saved_LD_RUN_PATH"
+export LD_RUN_PATH
+unset saved_LD_RUN_PATH
 #unset LD_LIBRARY_PATH
 
 ])

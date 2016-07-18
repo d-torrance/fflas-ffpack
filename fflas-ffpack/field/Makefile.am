@@ -1,5 +1,5 @@
 # Copyright (c) 2011 FFLAS-FFPACK
-# written by BB <bboyer@imag.fr>
+# written by Brice Boyer (briceboyer) <boyer.brice@gmail.com>
 # adapted from LinBox configuration
 #
 # ========LICENCE========
@@ -24,19 +24,17 @@
 
 pkgincludesubdir=$(pkgincludedir)/field
 
-pkgincludesub_HEADERS=          \
-	  modular-balanced.h        \
-	  modular-balanced-double.h \
-	  modular-balanced-float.h  \
-	  modular-balanced-int32.h  \
-	  modular-balanced-int64.h  \
-	  modular-positive.h        \
-	  modular-float.h           \
-	  modular-double.h          \
-	  modular-int32.h           \
-	  modular-int64.h           \
-	  nonzero-randiter.h        \
-	  modular-randiter.h        \
-	  unparametric.h            \
-	  field-general.h
+RNS=rns.h			        \
+	rns.inl				\
+	rns-double.h			\
+	rns-double-elt.h		\
+	rns-double.inl			\
+	rns-integer.h			\
+	rns-integer-mod.h     \
+	modular-extended.h
 
+pkgincludesub_HEADERS=          	\
+	  field-traits.h                \
+	  $(RNS)
+
+EXTRA_DIST=field.doxy

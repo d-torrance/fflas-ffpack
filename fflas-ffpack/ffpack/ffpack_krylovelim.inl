@@ -5,20 +5,20 @@
  *
  * Written by Clement Pernet <Clement.Pernet@imag.fr>
  *
- * 
+ *
  * ========LICENCE========
  * This file is part of the library FFLAS-FFPACK.
- * 
+ *
  * FFLAS-FFPACK is free software: you can redistribute it and/or modify
  * it under the terms of the  GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
@@ -29,14 +29,6 @@
 #ifndef __FFLASFFPACK_ffpack_krylovelim_INL
 #define __FFLASFFPACK_ffpack_krylovelim_INL
 
-#ifndef MIN
-#define MIN(a,b) (a<b)?a:b
-#endif
-#ifndef MAX
-#define MAX(a,b) (a<b)?b:a
-#endif
-
-//#define LB_DEBUG
 
 // A is m x n with m <= n
 // Ensures : rankprof is the row rankprofil of the matrix k x n matrix B formed as follows (k = sum d_i):
@@ -47,13 +39,12 @@
 template <class Field>
 inline size_t
 FFPACK::KrylovElim( const Field& F, const size_t M, const size_t N,
-		    typename Field::Element * A, const size_t lda, size_t*P,
+		    typename Field::Element_ptr A, const size_t lda, size_t*P,
 		    size_t *Q, const size_t deg, size_t *iterates,  size_t * inviterates,size_t  maxit,
 		    size_t virt)
 {
 
 	if ( !(M && N) ) return 0;
-	typedef typename Field::Element elt;
 
 	if (M == 1){
 		virt += deg;
@@ -112,9 +103,9 @@ FFPACK::KrylovElim( const Field& F, const size_t M, const size_t N,
 		// Recursive call on NW
 		size_t R = KrylovElim (F,  Nup, N, A, lda, P, Q, deg, iterates, inviterates, maxit, virt);
 
-		typename Field::Element *Ar = A + Nup*lda; // SW
-		typename Field::Element *Ac = A + R;     // NE
-		typename Field::Element *An = Ar + R;    // SE
+		typename Field::Element_ptr Ar = A + Nup*lda; // SW
+		typename Field::Element_ptr Ac = A + R;     // NE
+		typename Field::Element_ptr An = Ar + R;    // SE
 
 		if (R){
 			// Ar <- Ar.P
@@ -129,7 +120,7 @@ FFPACK::KrylovElim( const Field& F, const size_t M, const size_t N,
 			       F.mOne, Ar, lda, Ac, lda, F.one, An, lda);
 		}
 		// Recursive call on SE
-		size_t R2 = KrylovElim (F, Ndown, N-R, An, lda,P+R, Q+Nup, deg, iterates, inviterates, maxit, MIN(maxit-deg,(virt+Nup*deg)));
+		size_t R2 = KrylovElim (F, Ndown, N-R, An, lda,P+R, Q+Nup, deg, iterates, inviterates, maxit, std::min(maxit-deg,(virt+Nup*deg)));
 
 		for (size_t i = R; i < R + R2; ++i)
 			P[i] += R;
@@ -144,8 +135,8 @@ FFPACK::KrylovElim( const Field& F, const size_t M, const size_t N,
 		if (R < Nup){
 			// Permutation of the 0 rows
 			for ( size_t i = Nup, j = R ; i < Nup + R2; ++i, ++j){
-				FFLAS::fcopy( F, N - j, A + j*(lda + 1), 1, A + i*lda + j, 1);
-				for (typename Field::Element *Ai = A + i*lda + j;
+				FFLAS::fassign( F, N - j, A + i*lda + j, 1, A + j*(lda + 1), 1);
+				for (typename Field::Element_ptr Ai = A + i*lda + j;
 				     Ai != A + i*lda + N; ++Ai)
 					F.assign (*Ai, F.zero);
 				size_t t = Q[j];
@@ -160,15 +151,15 @@ FFPACK::KrylovElim( const Field& F, const size_t M, const size_t N,
 template <class Field>
 size_t
 FFPACK::SpecRankProfile (const Field& F, const size_t M, const size_t N,
-			 typename Field::Element * A, const size_t lda, const size_t deg,
+			 typename Field::Element_ptr A, const size_t lda, const size_t deg,
 			 size_t *rankProfile)
 {
 
 	//size_t deg = (N-1)/M+1; // Number of trivial iterates per blocs
-	size_t * Q = new size_t[M];
-	size_t * P = new size_t[N];
-	size_t * iterates = new size_t[N];
-	size_t * inviterates = new size_t[N+1];
+	size_t * Q = FFLAS::fflas_new<size_t>(M);
+	size_t * P = FFLAS::fflas_new<size_t>(N);
+	size_t * iterates = FFLAS::fflas_new<size_t>(N);
+	size_t * inviterates = FFLAS::fflas_new<size_t>(N+1);
 	for (size_t i=0; i < N; ++i)
 		inviterates[i+1] = iterates[i] = i+1;
 
@@ -195,10 +186,10 @@ FFPACK::SpecRankProfile (const Field& F, const size_t M, const size_t N,
 #ifdef LB_DEBUG
 						std::cerr<<"FAIL itere dependant intercale"<<std::endl;
 #endif
-						delete[] P;
-						delete[] Q;
-						delete[] iterates;
-						delete[] inviterates;
+						FFLAS::fflas_delete( P);
+						FFLAS::fflas_delete( Q);
+						FFLAS::fflas_delete( iterates);
+						FFLAS::fflas_delete( inviterates);
 						throw CharpolyFailed();
 					}
 #ifdef LB_DEBUG
@@ -228,10 +219,10 @@ FFPACK::SpecRankProfile (const Field& F, const size_t M, const size_t N,
 #endif
 		curr_row++;
 	}
-	delete[] P;
-	delete[] Q;
-	delete[] inviterates;
-	delete[] iterates;
+	FFLAS::fflas_delete( P);
+	FFLAS::fflas_delete( Q);
+	FFLAS::fflas_delete( inviterates);
+	FFLAS::fflas_delete( iterates);
 
 	return rp_idx;
 }

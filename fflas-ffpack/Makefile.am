@@ -1,5 +1,5 @@
 # Copyright (c) 2011 FFLAS-FFPACK
-# written by BB <bboyer@imag.fr>
+# written by Brice Boyer (briceboyer) <boyer.brice@gmail.com>
 # adapted from LinBox configuration
 #
 # ========LICENCE========
@@ -22,12 +22,12 @@
 #/
 
 
-SUBDIRS=fflas ffpack field
+SUBDIRS=fflas ffpack field utils paladin interfaces
 
-EXTRA_DIST=fflas-ffpack.doxy utils
+EXTRA_DIST=fflas-ffpack.doxy
 
 pkginclude_HEADERS = config-blas.h   \
 		     fflas-ffpack.h  \
+		     config.h \
 		     fflas-ffpack-config.h \
-		     fflas-ffpack-configuration.h \
 		     fflas-ffpack-optimise.h

@@ -9,20 +9,20 @@
  *
  * Written by Clement Pernet <Clement.Pernet@imag.fr>
  *
- * 
+ *
  * ========LICENCE========
  * This file is part of the library FFLAS-FFPACK.
- * 
+ *
  * FFLAS-FFPACK is free software: you can redistribute it and/or modify
  * it under the terms of the  GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
@@ -55,11 +55,12 @@ namespace FFPACK {
 			return ind;
 		}
 
+		// Subroutine for Keller-Gehrig charpoly algorithm
 		// Compute the new d after a LSP ( d[i] can be zero )
 		template<class Field>
 		size_t newD( const Field& F, size_t * d, bool& KeepOn,
 			     const size_t l, const size_t N,
-			     typename Field::Element * X,
+			     typename Field::Element_ptr X,
 			     const size_t * Q,
 			     std::vector<std::vector<typename Field::Element> >& minpt)
 		{
@@ -67,11 +68,12 @@ namespace FFPACK {
 			//const elt * Xi = X; // Xi points to the begining of each block
 			elt *Li=X, *Xminp=X;
 			KeepOn = false;
-			size_t nr, s, i, j, jtot=0, dtot = 0, nrtot=0;
+			size_t  i, jtot=0, dtot = 0, nrtot=0;
 
 			for ( i=0; dtot<N; ++i){ // for each block
-				j = 0;
-				nr = s = ( d[i]==l )? 2*l : d[i];
+				size_t j = 0;
+				size_t s ;
+				size_t nr = s = ( d[i]==l )? 2*l : d[i];
 				if (s > N-dtot)
 					s= N-dtot;
 				nrtot += nr;
@@ -108,27 +110,26 @@ namespace FFPACK {
 		template <class Field, class Polynomial>
 		std::list<Polynomial>&
 		KellerGehrig( const Field& F, std::list<Polynomial>& charp, const size_t N,
-			      const typename Field::Element * A, const size_t lda )
+			      typename Field::ConstElement_ptr A, const size_t lda )
 		{
 
 
-			typedef typename Field::Element elt;
-			const elt * Ai=A;
-			elt * U = new elt[N*N];     // to store A^2^i
-			elt * B = new elt[N*N];     // to store A^2^i
-			elt * V = new elt[N*N];     // to store A^2^i.U
-			elt * X = new elt[2*N*N];   // to compute the LSP factorization
-			elt *Ui, *Uj, *Uk, *Ukp1, *Ukp1new, *Bi, *Vi, *Vk, *Xi=X, *Xj;
-			size_t * P = new size_t[N]; // Column Permutation for LQUP
-			size_t * Q = new size_t[2*N]; // Row Permutation for LQUP
+			typename Field::ConstElement_ptr Ai = A;
+			typename Field::Element_ptr U = FFLAS::fflas_new (F, N, N);     // to store A^2^i
+			typename Field::Element_ptr B = FFLAS::fflas_new (F, N, N);     // to store A^2^i
+			typename Field::Element_ptr V = FFLAS::fflas_new (F, N, N);     // to store A^2^i.U
+			typename Field::Element_ptr X = FFLAS::fflas_new (F, 2*N, N);   // to compute the LSP factorization
+			typename Field::Element_ptr Ui, Uj, Uk, Ukp1, Ukp1new, Bi, Vi, Vk, Xi=X, Xj;
+			size_t * P = FFLAS::fflas_new<size_t>(N); // Column Permutation for LQUP
+			size_t * Q = FFLAS::fflas_new<size_t>(2*N); // Row Permutation for LQUP
 
-			size_t * d= new size_t[N];   // dimensions of Vect(ei, Aei...)
-			size_t * dv = new size_t[N];
-			size_t * dold = new size_t[N]; // copy of d
+			size_t * d= FFLAS::fflas_new<size_t>(N);   // dimensions of Vect(ei, Aei...)
+			size_t * dv = FFLAS::fflas_new<size_t>(N);
+			size_t * dold = FFLAS::fflas_new<size_t>(N); // copy of d
 			// vector of the opposite of the coefficient of computed minpolys
-			std::vector< std::vector< elt > > m(N);
+			std::vector< std::vector< typename Field::Element > > m(N);
 			typename Polynomial::iterator it;
-			size_t i=0, l=1, j, k=N,  cpt, newRowNb, nrowX, ind;
+			size_t i=0, l=1, j, k=N,  cpt, newRowNb;
 			bool  KeepOn;
 
 			for ( i=0; i<N; ++i)
@@ -155,11 +156,12 @@ namespace FFPACK {
 				P[i]=0;
 			for ( i=0;i<2*N;++i)
 				Q[i]=0;
-			LUdivine( F, FFLAS::FflasNonUnit, FFLAS::FflasNoTrans, 2*N, N, X, N, P, Q, FfpackLQUP);
+			LUdivine( F, FFLAS::FflasNonUnit, FFLAS::FflasNoTrans, 2*N, N, X, N, P, Q);
 
 			k = Protected::newD( F,d, KeepOn, l, N, X, Q, m);
 
 			while(KeepOn){ // Main loop, until each subspace dimension has been found
+				size_t nrowX, ind ;
 				// Updating U:
 				Uk = U;
 				// Firstly, removing extra rows
@@ -246,18 +248,18 @@ namespace FFPACK {
 					P[i]=0;
 				for ( i=0;i<2*N;++i)
 					Q[i]=0;
-				LUdivine( F, FFLAS::FflasNonUnit, FFLAS::FflasNoTrans, nrowX, N, X, N, P, Q, FfpackLQUP);
+				LUdivine( F, FFLAS::FflasNonUnit, FFLAS::FflasNoTrans, nrowX, N, X, N, P, Q);
 
 				// Recompute the degrees of the list factors
 				k = Protected::newD(F, d, KeepOn, l, N, X,Q, m);
 			}
-			delete[] U;
-			delete[] V;
-			delete[] B;
-			delete[] P;
-			delete[] Q;
-			delete[] dv;
-			delete[] dold;
+			FFLAS::fflas_delete (U);
+			FFLAS::fflas_delete (V);
+			FFLAS::fflas_delete (B);
+			FFLAS::fflas_delete( P);
+			FFLAS::fflas_delete( Q);
+			FFLAS::fflas_delete( dv);
+			FFLAS::fflas_delete( dold);
 
 			k = Protected::updateD( F, d, k, m);
 			// Constructing the CharPoly
@@ -269,8 +271,8 @@ namespace FFPACK {
 					F.neg(*it, m[i][j]);
 				charp.push_back( *minP );
 			}
-			delete[] X;
-			delete[] d;
+			FFLAS::fflas_delete (X);
+			FFLAS::fflas_delete( d);
 			return charp;
 		}
 

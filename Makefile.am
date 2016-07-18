@@ -1,5 +1,5 @@
 # Copyright (c) 2011 FFLAS-FFPACK
-# written by BB <bboyer@imag.fr>
+# written by Brice Boyer (briceboyer) <boyer.brice@gmail.com>
 # adapted from LinBox configuration
 #
 # ========LICENCE========
@@ -24,44 +24,60 @@
 
 ACLOCAL_AMFLAGS = -I macros
 
-SUBDIRS=fflas-ffpack tests doc benchmark macros utils optimiser
+SUBDIRS=fflas-ffpack tests doc benchmarks macros optimiser examples
 
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = fflas-ffpack.pc
 
+#  include_HEADERS=fflas-ffpack-config.h
 #!@todo add examples dir XXX
 
 docs:doc/fflas-ffpack-html/index.html
 
 doc/fflas-ffpack-html/index.html:
-	(cd doc; make docs)
+	(cd doc; ${MAKE} docs)
 
 docs_dev:doc/fflas-ffpack-dev-html/index.html
 
 doc/fflas-ffpack-dev-html/index.html:
-	(cd doc; make docs_dev)
+	(cd doc; ${MAKE} docs_dev)
 
-#  examples:
-#  (cd examples; make examples)
+perfpublisher: benchmarks/perfpublisher tests/perfpublisher
+
+benchmarks/perfpublisher:
+	(cd benchmarks; ${MAKE} perfpublisher)
+
+tests/perfpublisher:
+	(cd tests; ${MAKE} perfpublisher)
+
+examples:
+	(cd examples; ${MAKE} examples)
 
 benchmarks:
-	(cd benchmarks; make benchmarks)
+	(cd benchmarks; ${MAKE} benchmarks)
 
 uninstall-hook:
-	(test -d "$(includedir)/fflas-ffpack" && rmdir  "$(bindir)" \
-		"$(libdir)" \
-		"$(mandir)/man1" \
-		"$(mandir)" \
-		"$(includedir)/fflas-ffpack/fflas" \
-		"$(includedir)/fflas-ffpack/ffpack" \
-		"$(includedir)/fflas-ffpack/field" \
-		"$(includedir)/fflas-ffpack/utils" \
-		"$(includedir)/fflas-ffpack/"  \
-		"$(datarootdir)/" \
-		"$(includedir)") || true
+	(test -d "$(includedir)/fflas-ffpack" && rm -rf			\
+	       	"$(mandir)/man1" "$(mandir)"				\
+	       	"$(includedir)/fflas-ffpack/fflas"			\
+	       	"$(includedir)/fflas-ffpack/fflas/fflas_fgemm"		\
+	       	"$(includedir)/fflas-ffpack/ffpack"			\
+	       	"$(includedir)/fflas-ffpack/field"			\
+	       	"$(includedir)/fflas-ffpack/utils"			\
+	       	"$(includedir)/fflas-ffpack/paladin"			\
+	       	"$(includedir)/fflas-ffpack/interfaces"		        \
+	       	"$(includedir)/fflas-ffpack/interfaces/libs"	        \
+	       	"$(includedir)/fflas-ffpack/" "$(datarootdir)/" ) ||	\
+	       	true
 
 .PHONY:examples benchmarks
 
 bin_SCRIPTS=fflas-ffpack-config
 
-VERSION=1.6.0
+git:
+	git commit -a; git pull; git push
+
+VERSION=2.2.1
 
 #  EXTRA_DIST=incremente-versions
+

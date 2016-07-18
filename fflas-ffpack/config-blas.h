@@ -29,9 +29,34 @@
 #ifndef __FFLASFFPACK_config_blas_H
 #define __FFLASFFPACK_config_blas_H
 
-#ifndef __FFLASFFPACK_CONFIGURATION
-#include "fflas-ffpack/fflas-ffpack-configuration.h"
+// #include "fflas-ffpack/utils/fflas_memory.h"
+// #ifndef __FFLASFFPACK_CONFIGURATION
+// #include "fflas-ffpack/fflas-ffpack-config.h"
+// #endif
+
+// #ifdef OPTIMISATION_MODE
+// #include "fflas-ffpack/config.h"
+// #endif
+
+#ifdef HAVE_MKL
+#define __FFLASFFPACK_HAVE_MKL
 #endif
+
+#ifdef __FFLASFFPACK_HAVE_MKL
+#include <mkl.h>
+
+#endif
+
+
+#ifndef CBLAS_INT
+#ifdef blasint /*  openblas */
+#define CBLAS_INT blasint
+#elif defined( MKL_INT )
+#define CBLAS_INT MKL_INT
+#else
+#define CBLAS_INT int
+#endif /* blasint */
+#endif /*  CBLAS_INT */
 
 #ifdef CUDA_BLAS
 
@@ -40,8 +65,10 @@
 #define strsm_ cublas_strsm
 #define strmm_ cublas_strmm
 
-#endif
+#endif // CUDA_BLAS
 
+
+#ifndef __FFLASFFPACK_HAVE_MKL
 
 #define CBLAS_ENUM_DEFINED_H
 	enum CBLAS_ORDER {CblasRowMajor=101, CblasColMajor=102 };
@@ -50,7 +77,7 @@
 	enum CBLAS_DIAG  {CblasNonUnit=131, CblasUnit=132};
 	enum CBLAS_SIDE  {CblasLeft=141, CblasRight=142};
 
-	#define CBLAS_INDEX int
+// #define CBLAS_INDEX int
 
 
 #ifndef __FFLASFFPACK_HAVE_CBLAS
@@ -77,6 +104,7 @@ extern "C" {
 	void   daxpy_   (const int*, const double*, const double*, const int*, double*, const int*);
 	void   saxpy_   (const int*, const float*, const float*, const int*, float*, const int*);
 	double ddot_    (const int*, const double*, const int*, const double*, const int*);
+	float  sdot_    (const int*, const float*, const int*, const float*, const int*);
 	double dasum_   (const int*, const double*, const int*);
 	int    idamax_  (const int*, const double*, const int*);
 	double dnrm2_   (const int*, const double*, const int*);
@@ -85,6 +113,15 @@ extern "C" {
 	void dgemv_ (const char*, const int*, const int*, const double*, const double*, const int*, const double*, const int*, const double*, double*, const int*);
 	void sgemv_ (const char*, const int*, const int*, const float*, const float*, const int*, const float*, const int*, const float*, float*, const int*);
 	void dger_  (const int*, const int*, const double*, const double*, const int*, const double*, const int*, double*, const int*);
+	void sger_  (const int*, const int*, const float*, const float*, const int*, const float*, const int*, float*, const int*);
+
+	void dcopy_  (const int *, const double *, const int *, double *, const int *);
+	void scopy_  (const int *, const float  *, const int *, float  *, const int *);
+
+	void dscal_  (const int *, const double *, double *, const int *);
+	void sscal_  (const int *, const float  *, float  *, const int *);
+
+
 
 	// level 3 routines
 	void dtrsm_ (const char*, const char*, const char*, const char*, const int*, const int*, const double*, const double*, const int*, double*, const int*);
@@ -115,6 +152,12 @@ extern "C" {
 	{
 		return ddot_ (&N, X, &incX, Y, &incY);
 	}
+
+	inline float cblas_sdot(const int N, const float *X, const int incX, const float *Y, const int incY)
+	{
+		return sdot_ (&N, X, &incX, Y, &incY);
+	}
+
 
 	inline double cblas_dasum(const int N, const double *X, const int incX){
 		return dasum_ (&N, X, &incX);
@@ -157,6 +200,35 @@ extern "C" {
 			dger_ (&M, &N, &alpha, X, &incX, Y, &incY, A, &lda);
 	}
 
+	inline void cblas_sger(const enum CBLAS_ORDER Order, const int M, const int N, const float alpha, const float *X, const int incX,
+			const float *Y, const int incY, float *A, const int lda)
+	{
+		if (Order == CblasRowMajor)
+			sger_ (&N, &M, &alpha, Y, &incY, X, &incX, A, &lda);
+		else
+			sger_ (&M, &N, &alpha, X, &incX, Y, &incY, A, &lda);
+	}
+
+	void cblas_dcopy(const int N, const double *X, const int incX, double *Y, const int incY)
+	{
+		dcopy_(&N,X,&incX,Y,&incY);
+	}
+
+
+	void cblas_scopy(const int N, const float *X, const int incX, float *Y, const int incY)
+	{
+		scopy_(&N,X,&incX,Y,&incY);
+	}
+
+	void cblas_dscal(const int N, const double alpha,  double *Y, const int incY)
+	{
+		dscal_(&N,&alpha,Y,&incY);
+	}
+
+	void cblas_sscal(const int N, const float alpha,  float *Y, const int incY)
+	{
+		sscal_(&N,&alpha,Y,&incY);
+	}
 
 
 	// level 3 routines
@@ -235,6 +307,7 @@ extern "C" {
 	void   cblas_saxpy(const int N, const float alpha, const float *X, const int incX, float *Y, const int incY);
 
 	double cblas_ddot(const int N, const double *X, const int incX, const double *Y, const int incY);
+	float  cblas_sdot(const int N, const float *X, const int incX, const float *Y, const int incY);
 
 	double cblas_dasum(const int N, const double *X, const int incX);
 
@@ -253,6 +326,21 @@ extern "C" {
 
 	void cblas_dger(const enum CBLAS_ORDER Order, const int M, const int N, const double alpha, const double *X, const int incX,
 			const double *Y, const int incY, double *A, const int lda);
+
+	void cblas_sger(const enum CBLAS_ORDER Order, const int M, const int N, const float alpha, const float *X, const int incX,
+			const float *Y, const int incY, float *A, const int lda);
+
+	void cblas_dcopy(const int N, const double *X, const int incX,
+			 double *Y, const int incY);
+
+	void cblas_scopy(const int N, const float *X, const int incX,
+			 float *Y, const int incY);
+
+	void cblas_dscal(const int N, const double alpha,
+			 double *Y, const int incY);
+
+	void cblas_sscal(const int N, const float alpha,
+			 float *Y, const int incY);
 
 
 	// level 3 routines
@@ -283,6 +371,14 @@ extern "C" {
 }
 #endif // CBLAS ?
 
+#endif // __FFLASFFPACK_HAVE_MKL
+
+#ifdef __FFLASFFPACK_HAVE_MKL
+#define blas_enum
+#else
+#define blas_enum enum
+#endif
+
 #ifdef __FFLASFFPACK_HAVE_LAPACK
 
 #ifndef __FFLASFFPACK_HAVE_CLAPACK
@@ -299,15 +395,16 @@ extern "C" {
 
 	// static const char* EXT_BLAS_SIDE         (CBLAS_SIDE t)      { if (t == CblasLeft)  return "L"; else return "R";}
 	// static const char* EXT_BLAS_SIDE_tr      (CBLAS_SIDE t)      { if (t == CblasLeft)  return "R"; else return "L";}
-#endif
+#endif // CBLAS_EXTERNALS
 
 
 // define external link to LAPACK routines
 extern "C" {
-        void dgetrf_ (const int *, const int *, double *, const int *, int *, int *);
-        void dgetri_ (const int *, double *, const int *, const int *, double *, const int *, int *);
-        void dtrtri_ (const char *, const char *, const int *, double *, const int *, int *);
-	void dswap_ (const int *, double *, const int *, double *, const int *);
+	//!@bug we should also allow lapacke from MLK
+        void dgetrf_ (const CBLAS_INT *, const CBLAS_INT *, double *, const CBLAS_INT *, CBLAS_INT *, CBLAS_INT *);
+        void dgetri_ (const CBLAS_INT *, double *, const CBLAS_INT *, const CBLAS_INT *, double *, const CBLAS_INT *, CBLAS_INT *);
+        void dtrtri_ (const char *, const char *, const CBLAS_INT *, double *, const CBLAS_INT *, CBLAS_INT *);
+	void dswap_ (const CBLAS_INT *, double *, const CBLAS_INT *, double *, const CBLAS_INT *);
 }
 
 // define C wrappers
@@ -316,22 +413,23 @@ extern "C" {
 
 	// return A=P.L.U (L unitary) with ColMajor
 	// return A=L.U.P (U unitary) with RowMajor
-	inline int clapack_dgetrf(const enum CBLAS_ORDER Order, const int M, const int N,
-			   double *A, const int lda, int *ipiv)
+	//! @bug Order is not used. we should use ATLAS/interfaces/lapack/C/src/clapack_dgetrf.c or similar
+	inline CBLAS_INT clapack_dgetrf(const blas_enum CBLAS_ORDER, const CBLAS_INT M, const CBLAS_INT N,
+			   double *A, const CBLAS_INT lda, CBLAS_INT *ipiv)
         {
-            int info;
+            CBLAS_INT info;
 	    dgetrf_ ( &M, &N, A, &lda, ipiv, &info);
             return info;
         }
 
-	inline int clapack_dgetri(const enum CBLAS_ORDER Order, const int N, double *A,
-			   const int lda, const int *ipiv)
+	inline CBLAS_INT clapack_dgetri(const blas_enum CBLAS_ORDER, const CBLAS_INT N, double *A,
+			   const CBLAS_INT lda, const CBLAS_INT *ipiv)
 	{
-		int info;
+		CBLAS_INT info;
 		double *work;
 
 #ifndef __FFLASFFPACK_AUTOIMPLEMENT_DGETRI
-		// the optimum size of work can be determinted via the
+		// the optimum size of work can be determCBLAS_INTed via the
 		// Lapack function ilaenv.
 		work= new double[N];
 		dgetri_ (&N, A, &lda, ipiv, work, &N,  &info);
@@ -342,8 +440,8 @@ extern "C" {
 		if (info > 0)
 			return 0;
 
-		for (int i=0;i<N;++i){
-			for(int j=i;j<N;++j){
+		for (CBLAS_INT i=0;i<N;++i){
+			for(CBLAS_INT j=i;j<N;++j){
 				work[i*N+j]=A[i*N+j];
 				if (j>i) A[i*N+j]=0.0;
 			}
@@ -353,9 +451,9 @@ extern "C" {
 		double cst=1.;
 		dtrsm_ ("R", "L", "N", "U", &N, &N, &cst, work, &N, A, &N);
 
-		int ip;
-		const int incr=1;
-		for (int i=0; i<N; ++i){
+		CBLAS_INT ip;
+		const CBLAS_INT incr=1;
+		for (CBLAS_INT i=0; i<N; ++i){
 			ip = ipiv[i]-1;
 			if (ip != i)
 				dswap_ (&N, &A[i*lda],&incr , &A[ip*lda], &incr);
@@ -366,10 +464,10 @@ extern "C" {
 		return info;
 	}
 
-	inline int clapack_dtrtri(const enum CBLAS_ORDER Order,const enum CBLAS_UPLO Uplo,
-			   const enum CBLAS_DIAG Diag,const int N, double *A, const int lda)
+	inline CBLAS_INT clapack_dtrtri(const blas_enum CBLAS_ORDER Order,const blas_enum CBLAS_UPLO Uplo,
+			   const blas_enum CBLAS_DIAG Diag,const CBLAS_INT N, double *A, const CBLAS_INT lda)
 	{
-		int info;
+		CBLAS_INT info;
 		if (Order == CblasRowMajor)
 			dtrtri_ (EXT_BLAS_UPLO_tr(Uplo), EXT_BLAS_DIAG(Diag), &N, A, &lda, &info);
 		else
@@ -386,16 +484,17 @@ extern "C" {
 extern "C" {
 	// LAPACK routines
 
-	int clapack_dgetrf(const enum CBLAS_ORDER Order, const int M, const int N,
-			   double *A, const int lda, int *ipiv);
-	int clapack_dgetri(const enum CBLAS_ORDER Order, const int N, double *A,
-			   const int lda, const int *ipiv);
-	int clapack_dtrtri(const enum CBLAS_ORDER Order,const enum CBLAS_UPLO Uplo,
-			   const enum CBLAS_DIAG Diag,const int N, double *A, const int lda);
+	CBLAS_INT clapack_dgetrf(const blas_enum CBLAS_ORDER Order, const CBLAS_INT M, const CBLAS_INT N,
+			   double *A, const CBLAS_INT lda, CBLAS_INT *ipiv);
+	CBLAS_INT clapack_dgetri(const blas_enum CBLAS_ORDER Order, const CBLAS_INT N, double *A,
+			   const CBLAS_INT lda, const CBLAS_INT *ipiv);
+	CBLAS_INT clapack_dtrtri(const blas_enum CBLAS_ORDER Order,const blas_enum CBLAS_UPLO Uplo,
+			   const blas_enum CBLAS_DIAG Diag,const CBLAS_INT N, double *A, const CBLAS_INT lda);
 
 }
+#endif // CLAPACK ?
+
 #endif // LAPACK ?
 
-#endif
 
 #endif //__FFLASFFPACK_config_blas_H
