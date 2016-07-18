@@ -1,4 +1,4 @@
-doc/fflas-ffpack-html/*.html
-doc/fflas-ffpack-html/*.png
 doc/fflas-ffpack-html/*.css
+doc/fflas-ffpack-html/*.html
 doc/fflas-ffpack-html/*.js
+doc/fflas-ffpack-html/*.png
