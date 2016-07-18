@@ -1,214 +1,133 @@
-#ifndef _FFLAS_FFPACK_FFLAS_FFPACK_CONFIG_H
-#define _FFLAS_FFPACK_FFLAS_FFPACK_CONFIG_H 1
- 
-/* fflas-ffpack/fflas-ffpack-config.h. Generated automatically at end of configure. */
-/* config.h.  Generated from config.h.in by configure.  */
-/* config.h.in.  Generated from configure.ac by autoheader.  */
+/* -*- mode: C++; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- */
+// vim:sts=8:sw=8:ts=8:noet:sr:cino=>s,f0,{0,g0,(0,\:0,t0,+0,=s
+/* Copyright (C) 2012 FFLAS-FFPACK
+ * Written by Brice Boyer (briceboyer) <boyer.brice@gmail.com>
+ *
+ *
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the
+ * Free Software Foundation, Inc., 51 Franklin Street - Fifth Floor,
+ * Boston, MA 02110-1301, USA.
+ */
 
-/* Define if building universal (internal helper macro) */
-/* #undef __FFLASFFPACK_AC_APPLE_UNIVERSAL_BUILD */
+/*! @file fflas-ffpack/fflas-ffpack-config.h
+ * @ingroup optimise
+ * @brief Defaults for optimised values.
+ * While \c fflas-ffpack-optimise.h is created by \c configure script,
+ * (either left blank or filled by optimiser), this file produces the
+ * defaults for the optimised values. If \c fflas-ffpack-optimise.h is not
+ * empty, then its values preceeds the defaults here.
+ */
 
-/* Define if GMP is version 3.xxx */
-/* #undef __FFLASFFPACK_GMP_VERSION_3 */
 
-/* Define that architecture uses big endian storage */
-/* #undef __FFLASFFPACK_HAVE_BIG_ENDIAN */
+#ifndef __FFLASFFPACK_fflas_ffpack_configuration_H
+#define __FFLASFFPACK_fflas_ffpack_configuration_H
 
-/* Define if BLAS is installed */
-#ifndef __FFLASFFPACK_HAVE_BLAS 
-#define __FFLASFFPACK_HAVE_BLAS  1 
+#ifndef GCC_VERSION
+#define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #endif
 
-/* Define if C interface to BLAS is available */
-#ifndef __FFLASFFPACK_HAVE_CBLAS 
-#define __FFLASFFPACK_HAVE_CBLAS  1 
+#ifdef __CYGWIN__
+#  define _GLIBCXX_USE_C99 true
+#  ifndef _GLIBCXX_USE_C99_MATH_TR1
+#    include <cstdlib>
+#    include <string>
+#    include <cmath>
+#    undef fma
+#    include <stdlib.h>
+#    undef strtoull
+#    undef strtoll
+namespace std _GLIBCXX_VISIBILITY(default)
+{
+_GLIBCXX_BEGIN_NAMESPACE_VERSION
+  using ::fma;
+  using ::strtoll;
+  using ::strtoull;
+
+/*
+  unsigned long      stoul( const std::string& str, std::size_t* pos = 0, int base = 10 ) {
+      return std::strtoul(str.c_str(), NULL, base);
+  } 
+
+  unsigned long long stoull( const std::string& str, std::size_t* pos = 0, int base = 10 ) {
+      return std::strtoull(str.c_str(), NULL, base);
+  }
+  
+  long      stol( const std::string& str, std::size_t* pos = 0, int base = 10 ) {
+      return std::strtol(str.c_str(), NULL, base);
+  } 
+
+  long long stoll( const std::string& str, std::size_t* pos = 0, int base = 10 ) {
+      return std::strtoll(str.c_str(), NULL, base);
+  }
+*/
+  
+}
+#  else
+#    define _GLIBCXX_USE_C99 true
+#    include <cstdlib>
+#  endif
 #endif
 
-/* Define if C interface to LAPACK is available */
-#ifndef __FFLASFFPACK_HAVE_CLAPACK 
-#define __FFLASFFPACK_HAVE_CLAPACK  1 
+#include "fflas-ffpack/config.h"
+#ifdef __FFLASFFPACK_USE_OPENMP
+#  ifndef __GIVARO_USE_OPENMP
+#    define __GIVARO_USE_OPENMP 1
+#  endif
 #endif
 
-/* Define to 1 if you have the <dlfcn.h> header file. */
-#ifndef __FFLASFFPACK_HAVE_DLFCN_H 
-#define __FFLASFFPACK_HAVE_DLFCN_H  1 
+#include "fflas-ffpack/fflas-ffpack-optimise.h"
+
+#if defined(__FFLASFFPACK_USE_SSE) or defined(__FFLASFFPACK_USE_AVX) or defined(__FFLASFFPACK_USE_AVX2)
+#define __FFLASFFPACK_USE_SIMD // see configure...
 #endif
 
-/* Define to 1 if you have the <float.h> header file. */
-#ifndef __FFLASFFPACK_HAVE_FLOAT_H 
-#define __FFLASFFPACK_HAVE_FLOAT_H  1 
+
+
+// winograd algorithm threshold (for double)
+#ifndef __FFLASFFPACK_WINOTHRESHOLD
+#define __FFLASFFPACK_WINOTHRESHOLD 1000
 #endif
 
-/* Define if GIVARO is installed */
-/* #undef __FFLASFFPACK_HAVE_GIVARO */
-
-/* Define if GMP is installed */
-#ifndef __FFLASFFPACK_HAVE_GMP 
-#define __FFLASFFPACK_HAVE_GMP  1 
+#ifndef __FFLASFFPACK_WINOTHRESHOLD_FLT
+#define __FFLASFFPACK_WINOTHRESHOLD_FLT 2000
 #endif
 
-/* Define to 1 if you have the <inttypes.h> header file. */
-#ifndef __FFLASFFPACK_HAVE_INTTYPES_H 
-#define __FFLASFFPACK_HAVE_INTTYPES_H  1 
+#ifndef __FFLASFFPACK_WINOTHRESHOLD_BAL
+#define __FFLASFFPACK_WINOTHRESHOLD_BAL 1000
 #endif
 
-/* Define if LAPACK is installed */
-#ifndef __FFLASFFPACK_HAVE_LAPACK 
-#define __FFLASFFPACK_HAVE_LAPACK  1 
+#ifndef __FFLASFFPACK_WINOTHRESHOLD_BAL_FLT
+#define __FFLASFFPACK_WINOTHRESHOLD_BAL_FLT 2000
 #endif
 
-/* Define to 1 if you have the <limits.h> header file. */
-#ifndef __FFLASFFPACK_HAVE_LIMITS_H 
-#define __FFLASFFPACK_HAVE_LIMITS_H  1 
+
+#if defined(_OPENMP) || defined(OMP_H) || defined(__OMP_H) || defined(__pmp_omp_h)
+#ifndef __FFLASFFPACK_USE_OPENMP
+#warning "openmp was not detected correctly at configure time, please report this bug"
+#define __FFLASFFPACK_USE_OPENMP
+#endif
 #endif
 
-/* Define that architecture uses little endian storage */
-#ifndef __FFLASFFPACK_HAVE_LITTLE_ENDIAN 
-#define __FFLASFFPACK_HAVE_LITTLE_ENDIAN  1 
-#endif
+#ifdef __x86_64__
+#if defined(__GNUC__) || defined (__clang__) /* who supports __int128_t ? */
+#define int128_t __int128_t
+#define uint128_t unsigned __int128_t
+#else /* hopefully this exists */
+#define int128_t __int128
+#define uint128_t unsigned __int128
+#endif /* __int128_t */
+#endif /* __x86_64__ */
 
-/* Define to 1 if you have the <memory.h> header file. */
-#ifndef __FFLASFFPACK_HAVE_MEMORY_H 
-#define __FFLASFFPACK_HAVE_MEMORY_H  1 
-#endif
-
-/* Define to 1 if you have the <stddef.h> header file. */
-#ifndef __FFLASFFPACK_HAVE_STDDEF_H 
-#define __FFLASFFPACK_HAVE_STDDEF_H  1 
-#endif
-
-/* Define to 1 if you have the <stdint.h> header file. */
-#ifndef __FFLASFFPACK_HAVE_STDINT_H 
-#define __FFLASFFPACK_HAVE_STDINT_H  1 
-#endif
-
-/* Define to 1 if you have the <stdlib.h> header file. */
-#ifndef __FFLASFFPACK_HAVE_STDLIB_H 
-#define __FFLASFFPACK_HAVE_STDLIB_H  1 
-#endif
-
-/* Define to 1 if you have the <strings.h> header file. */
-#ifndef __FFLASFFPACK_HAVE_STRINGS_H 
-#define __FFLASFFPACK_HAVE_STRINGS_H  1 
-#endif
-
-/* Define to 1 if you have the <string.h> header file. */
-#ifndef __FFLASFFPACK_HAVE_STRING_H 
-#define __FFLASFFPACK_HAVE_STRING_H  1 
-#endif
-
-/* Define to 1 if you have the <sys/stat.h> header file. */
-#ifndef __FFLASFFPACK_HAVE_SYS_STAT_H 
-#define __FFLASFFPACK_HAVE_SYS_STAT_H  1 
-#endif
-
-/* Define to 1 if you have the <sys/time.h> header file. */
-#ifndef __FFLASFFPACK_HAVE_SYS_TIME_H 
-#define __FFLASFFPACK_HAVE_SYS_TIME_H  1 
-#endif
-
-/* Define to 1 if you have the <sys/types.h> header file. */
-#ifndef __FFLASFFPACK_HAVE_SYS_TYPES_H 
-#define __FFLASFFPACK_HAVE_SYS_TYPES_H  1 
-#endif
-
-/* Define to 1 if you have the <unistd.h> header file. */
-#ifndef __FFLASFFPACK_HAVE_UNISTD_H 
-#define __FFLASFFPACK_HAVE_UNISTD_H  1 
-#endif
-
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
-#ifndef __FFLASFFPACK_LT_OBJDIR 
-#define __FFLASFFPACK_LT_OBJDIR  ".libs/" 
-#endif
-
-/* Name of package */
-#ifndef __FFLASFFPACK_PACKAGE 
-#define __FFLASFFPACK_PACKAGE  "fflas-ffpack" 
-#endif
-
-/* Define to the address where bug reports for this package should be sent. */
-#ifndef __FFLASFFPACK_PACKAGE_BUGREPORT 
-#define __FFLASFFPACK_PACKAGE_BUGREPORT  "ffpack-devel@googlegroups.com" 
-#endif
-
-/* Define to the full name of this package. */
-#ifndef __FFLASFFPACK_PACKAGE_NAME 
-#define __FFLASFFPACK_PACKAGE_NAME  "FFLAS-FFPACK" 
-#endif
-
-/* Define to the full name and version of this package. */
-#ifndef __FFLASFFPACK_PACKAGE_STRING 
-#define __FFLASFFPACK_PACKAGE_STRING  "FFLAS-FFPACK 1.6.0" 
-#endif
-
-/* Define to the one symbol short name of this package. */
-#ifndef __FFLASFFPACK_PACKAGE_TARNAME 
-#define __FFLASFFPACK_PACKAGE_TARNAME  "fflas-ffpack" 
-#endif
-
-/* Define to the home page for this package. */
-#ifndef __FFLASFFPACK_PACKAGE_URL 
-#define __FFLASFFPACK_PACKAGE_URL  "http://www.linalg.org/projects/fflas-ffpack" 
-#endif
-
-/* Define to the version of this package. */
-#ifndef __FFLASFFPACK_PACKAGE_VERSION 
-#define __FFLASFFPACK_PACKAGE_VERSION  "1.6.0" 
-#endif
-
-/* The size of `char', as computed by sizeof. */
-#ifndef __FFLASFFPACK_SIZEOF_CHAR 
-#define __FFLASFFPACK_SIZEOF_CHAR  1 
-#endif
-
-/* The size of `int', as computed by sizeof. */
-#ifndef __FFLASFFPACK_SIZEOF_INT 
-#define __FFLASFFPACK_SIZEOF_INT  4 
-#endif
-
-/* The size of `long', as computed by sizeof. */
-#ifndef __FFLASFFPACK_SIZEOF_LONG 
-#define __FFLASFFPACK_SIZEOF_LONG  8 
-#endif
-
-/* The size of `long long', as computed by sizeof. */
-#ifndef __FFLASFFPACK_SIZEOF_LONG_LONG 
-#define __FFLASFFPACK_SIZEOF_LONG_LONG  8 
-#endif
-
-/* The size of `short', as computed by sizeof. */
-#ifndef __FFLASFFPACK_SIZEOF_SHORT 
-#define __FFLASFFPACK_SIZEOF_SHORT  2 
-#endif
-
-/* The size of `__int64', as computed by sizeof. */
-#ifndef __FFLASFFPACK_SIZEOF___INT64 
-#define __FFLASFFPACK_SIZEOF___INT64  0 
-#endif
-
-/* Define to 1 if you have the ANSI C header files. */
-#ifndef __FFLASFFPACK_STDC_HEADERS 
-#define __FFLASFFPACK_STDC_HEADERS  1 
-#endif
-
-/* Version number of package */
-#ifndef __FFLASFFPACK_VERSION 
-#define __FFLASFFPACK_VERSION  "1.6.0" 
-#endif
-
-/* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
-   significant byte first (like Motorola and SPARC, unlike Intel). */
-#if defined AC_APPLE_UNIVERSAL_BUILD
-# if defined __BIG_ENDIAN__
-#  define WORDS_BIGENDIAN 1
-# endif
-#else
-# ifndef WORDS_BIGENDIAN
-/* #  undef WORDS_BIGENDIAN */
-# endif
-#endif
- 
-/* once: _FFLAS_FFPACK_FFLAS_FFPACK_CONFIG_H */
-#endif
+#endif // __FFLASFFPACK_fflas_ffpack_configuration_H

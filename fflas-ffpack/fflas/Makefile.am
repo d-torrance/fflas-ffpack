@@ -1,5 +1,5 @@
 # Copyright (c) 2011 FFLAS-FFPACK
-# written by BB <bboyer@imag.fr>
+# written by Brice Boyer (briceboyer) <boyer.brice@gmail.com>
 # adapted from LinBox configuration
 #
 # ========LICENCE========
@@ -24,21 +24,48 @@
 
 pkgincludesubdir=$(pkgincludedir)/fflas
 
+SUBDIRS=fflas_fgemm fflas_igemm fflas_simd fflas_sparse
+
+sparse=fflas_sparse.h \
+       fflas_sparse.inl
+
+multiprecision= fflas_ftrsm_mp.inl \
+		fflas_fscal_mp.inl \
+		fflas_freduce_mp.inl \
+		fflas_fger_mp.inl  \
+		fflas_fgemv_mp.inl
+
 pkgincludesub_HEADERS=       \
 	   fflas_bounds.inl      \
-	   fflas_fcopy.inl       \
+	   fflas_fassign.h       \
+	   fflas_fassign.inl       \
 	   fflas_ftrmm.inl       \
 	   fflas.h               \
-	   fflas_faddm.inl       \
+	   fflas_level1.inl \
+	   fflas_level2.inl \
+	   fflas_level3.inl \
+	   fflas_fadd.h        \
+	   fflas_fadd.inl        \
 	   fflas_fdot.inl        \
 	   fflas_ftrmm_src.inl   \
-	   fflas_faddmin_src.inl \
 	   fflas_fgemm.inl       \
+	   fflas_pfgemm.inl      \
+	   fflas_pftrsm.inl      \
 	   fflas_ftrsm.inl       \
-	   fflas_faddm_src.inl   \
 	   fflas_fgemv.inl       \
+	   fflas_freivalds.inl       \
+	   fflas_fscal.h       \
+	   fflas_fscal.inl       \
 	   fflas_ftrsm_src.inl   \
 	   fflas_faxpy.inl       \
 	   fflas_fger.inl        \
-	   fflas_ftrsv.inl
+	   fflas_ftrsv.inl       \
+	   fflas_freduce.h         \
+	   fflas_freduce.inl       \
+	   fflas_helpers.inl     \
+	   fflas_simd.h          \
+	   fflas_enum.h          \
+	   ${sparse}		 \
+	   ${multiprecision}
 
+EXTRA_DIST=fflas.doxy

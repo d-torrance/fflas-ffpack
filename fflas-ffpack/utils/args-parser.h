@@ -34,6 +34,8 @@
 #ifndef __FFLASFFPACK_args_parser_H
 #define __FFLASFFPACK_args_parser_H
 
+#include <fflas-ffpack/fflas-ffpack-config.h>
+#include <givaro/givinteger.h>
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -44,12 +46,18 @@
 #include "fflas-ffpack/utils/print-utils.h"
 
 enum ArgumentType {
-	TYPE_NONE, TYPE_INT, TYPE_INTEGER, TYPE_DOUBLE, TYPE_INTLIST, TYPE_STR
+	TYPE_NONE, TYPE_INT, TYPE_LONGLONG, TYPE_INTEGER, TYPE_DOUBLE, TYPE_INTLIST, TYPE_STR
 };
 #define TYPE_BOOL TYPE_NONE
 
 #define END_OF_ARGUMENTS \
 { '\0', "\0", "\0", TYPE_NONE, NULL }
+
+#ifdef _GIVARO_CONFIG_H
+#define type_integer Givaro::Integer
+#else
+#define type_integer long int
+#endif
 
 struct Argument
 {
@@ -65,10 +73,6 @@ struct Argument
 namespace FFLAS {
     void parseArguments (int argc, char **argv, Argument *args, bool printDefaults = true);
 }
-
-
-/** writes the values of all arguments, preceded by the programName */
-std::ostream& writeCommandString (std::ostream& os, Argument *args, char* programName);
 
 void printHelpMessage (const char *program, Argument *args, bool printDefaults = false)
 {
@@ -111,8 +115,11 @@ void printHelpMessage (const char *program, Argument *args, bool printDefaults =
 			case TYPE_INT:
 				std::cout << *(int *) args[i].data;
 				break;
+			case TYPE_LONGLONG:
+				std::cout << *(long long *) args[i].data;
+				break;
 			case TYPE_INTEGER:
-				std::cout << *(long int *) args[i].data;
+				std::cout << *(type_integer *) args[i].data;
 				break;
 			case TYPE_DOUBLE:
 				std::cout << *(double *) args[i].data;
@@ -121,7 +128,7 @@ void printHelpMessage (const char *program, Argument *args, bool printDefaults =
 				std::cout << *(std::list<int> *) args[i].data ;
 				break;
 			case TYPE_STR:
-				std::cout << *(std::string *) args[i].data ;
+				std::cout << "\"" << *(std::string *) args[i].data << "\"" ;
 				break;
 			}
 			std::cout << ")";
@@ -130,15 +137,15 @@ void printHelpMessage (const char *program, Argument *args, bool printDefaults =
 	}
 
 	std::cout << "  -h or -?  Display this message" << std::endl;
-	if (messageboolean) 
+	if (messageboolean)
         std::cout << "For boolean switches, the argument may be omitted, meaning the switch should be ON" << std::endl;
 	std::cout << std::endl;
 	std::cout << "If <report file> is '-' the report is written to std output.  If <report file> is" << std::endl;
 	std::cout << "not given, then no detailed reporting is done. This is suitable if you wish only" << std::endl;
 	std::cout << "to determine whether the tests succeeded." << std::endl;
 	std::cout << std::endl;
-	if (messageprimality) 
-        std::cout << "[1] N.B. This program does not verify the primality of Q, and does not use a" << std::endl 
+	if (messageprimality)
+        std::cout << "[1] N.B. This program does not verify the primality of Q, and does not use a" << std::endl
                   << "    field extension in the event that Q=p^n, n > 1" << std::endl;
 	std::cout << std::endl;
 }
@@ -227,7 +234,7 @@ namespace FFLAS {
                     std::cout << "Writing report data to cout (intermingled with brief report)" << std::endl << std::endl;
                     std::cout.flush ();
                 }
-                else if (argv[i][1] == 'h' || argv[i][1] == '?') {
+                else if (argv[i][1] == 'h' || argv[i][1] == '?' || argv[i][1] == '-') {
                     printHelpMessage (argv[0], args, printDefaults);
                     exit (1);
                 }
@@ -237,7 +244,7 @@ namespace FFLAS {
                         {
                             if (argc == i+1 || (argv[i+1][0] == '-' && argv[i+1][1] != '\0')) {
                                     // if at last argument, or next argument is a switch, set to true
-                                *(bool *) current->data = true;
+                                *((bool *) current->data) = true;
                                 break;
                             }
                             *(bool *) current->data =
@@ -257,11 +264,22 @@ namespace FFLAS {
                         }
                         break;
 
-                        case TYPE_INTEGER:
+                        case TYPE_LONGLONG:
                         {
-                            long int tmp = atoi(argv[i+1]);
-                            *(long int *) current->data = tmp;
+                            *(long long *) current->data = atoi (argv[i+1]);
+                            ++i;
                         }
+                        break;
+
+                        case TYPE_INTEGER:
+			{
+#ifdef _GIVARO_CONFIG_H
+				type_integer tmp(argv[i+1]);
+#else
+				type_integer tmp = atol(argv[i+1]);
+#endif
+				*(type_integer *) current->data = tmp;
+			}
                         ++i;
                         break;
 
@@ -300,37 +318,45 @@ namespace FFLAS {
             }
         }
     }
-}
 
-
-std::ostream& writeCommandString (std::ostream& os, Argument *args, char* programName)
-{
-	os << programName;
-	for (int i = 0; args[i].c != '\0'; ++i) {
-		os << " -" << args[i].c;
-		switch (args[i].type) {
-		case TYPE_NONE:
-			if (! (*(bool *)args[i].data)) os << " N";
-			break;
-		case TYPE_INT:
-			os << ' ' << *(int *) args[i].data;
-			break;
-		case TYPE_INTEGER:
-			os << ' ' << *(long int *) args[i].data;
-			break;
-		case TYPE_DOUBLE:
-			os << ' ' << *(double *) args[i].data;
-			break;
-		case TYPE_INTLIST:
-			os << ' ' << *(std::list<int> *) args[i].data;
-			break;
-		case TYPE_STR:
-			os << ' ' << *(std::string *) args[i].data;
-			break;
+	/** writes the values of all arguments, preceded by the programName */
+	std::ostream& writeCommandString (std::ostream& os, Argument *args, char* programName = nullptr)
+	{
+		if (programName != nullptr)
+			os << programName;
+		
+		for (int i = 0; args[i].c != '\0'; ++i) {
+			os << " -" << args[i].c;
+			switch (args[i].type) {
+			case TYPE_NONE:
+				if ((*(bool *)args[i].data)) os << " Y";
+				else os << " N";
+				break;
+			case TYPE_INT:
+				os << ' ' << *(int *) args[i].data;
+				break;
+			case TYPE_LONGLONG:
+				os << ' ' << *(long long *) args[i].data;
+				break;
+			case TYPE_INTEGER:
+				os << ' ' << *(Givaro::Integer *) args[i].data;
+				break;
+			case TYPE_DOUBLE:
+				os << ' ' << *(double *) args[i].data;
+				break;
+			case TYPE_INTLIST:
+				os << ' ' << *(std::list<int> *) args[i].data;
+				break;
+			case TYPE_STR:
+				os << " \"" << *(std::string *) args[i].data << "\"";
+				break;
+			}
 		}
+		
+		return os;
 	}
-	return os << std::endl;
 }
 
+#undef type_integer
 
 #endif // __FFLASFFPACK_args_parser_H

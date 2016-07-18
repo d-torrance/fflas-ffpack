@@ -1,5 +1,5 @@
 # Copyright (c) 2011 FFLAS-FFPACK
-# written by BB <bboyer@imag.fr>
+# written by Brice Boyer (briceboyer) <boyer.brice@gmail.com>
 # adapted from LinBox configuration
 #
 # ========LICENCE========
@@ -21,17 +21,16 @@
 # ========LICENCE========
 #/
 
-
-
 AC_PREREQ([2.61])
 
-AC_INIT([FFLAS-FFPACK], [1.6.0],[ffpack-devel@googlegroups.com],[fflas-ffpack],
-		[http://www.linalg.org/projects/fflas-ffpack])
+AC_INIT([FFLAS-FFPACK], [2.2.1],[ffpack-devel@googlegroups.com],[fflas-ffpack],
+		[https://github.com/linbox-team/fflas-ffpack])
+
 AC_CONFIG_MACRO_DIR([macros])
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([1.8 gnu no-dependencies -Wall -Wno-portability])
-AM_CONFIG_HEADER([config.h])
-AX_PREFIX_CONFIG_H(fflas-ffpack/fflas-ffpack-config.h, __FFLASFFPACK)
+AC_CONFIG_HEADERS([config.h])
+AX_PREFIX_CONFIG_H(fflas-ffpack/config.h, __FFLASFFPACK)
 AC_PATH_PROG(RM, rm, $FALSE)
 RM="$RM -f"
 
@@ -54,12 +53,14 @@ AC_PROFILE
 AC_WARNINGS
 
 echo "-----------------------------------------------"
+
 # CFLAGS=${CFLAGS:-$DEFAULT_CFLAGS}
 # CXXFLAGS=${CXXFLAGS:-$DEFAULT_CXXFLAGS}
 
 ######################################################
 # Try and pass different flags according to compiler #
 ######################################################
+
 
 # disable default -g -O2 CXXFLAGS
 : ${CXXFLAGS=""}
@@ -69,21 +70,25 @@ AC_PROG_CXX
 
 AC_COMPILER_NAME
 
+# We need a C++11 compiler now - AB 2014-12-12
+AX_CXX_COMPILE_STDCXX_11([],[mandatory])
+
 AC_SUBST([DEFAULT_CFLAGS])
 AC_SUBST([DEBUG_CFLAGS])
 AC_SUBST([TESTS_CFLAGS])
 
 TESTS_CFLAGS="-O0"
 DEBUG_CFLAGS="-g"
-DEFAULT_CFLAGS="-pipe"
+DEFAULT_CFLAGS=""
 WARN_CFLAGS="-Wall"
 
+#TODO use -fast for icc, -ipa for eko...
 if test "x$DBG" = "xyes" ; then
-	DEFAULT_CFLAGS="-O0 ${DEFAULT_CFLAGS} " #those are CXXFLAGS
+	DEFAULT_CFLAGS="-O0 ${DEFAULT_CFLAGS}" #those are CXXFLAGS
 	DEBUG_CFLAGS="${DEBUG_CFLAGS} -DDEBUG -DFFLASFFPACK_DEBUG"
 else
-	DEFAULT_CFLAGS="-O2 ${DEFAULT_CFLAGS} "
-	DEBUG_CFLAGS="${DEBUG_CFLAGS} -DNDEBUG -UFFLASFFPACK_DEBUG -UFFLASFFPACK_DEBUG"
+	DEFAULT_CFLAGS="-O2 ${DEFAULT_CFLAGS}"
+	DEBUG_CFLAGS="-DNDEBUG -UFFLASFFPACK_DEBUG"
 fi
 
 if test "x$PROF" = "xyes" ; then
@@ -91,41 +96,102 @@ if test "x$PROF" = "xyes" ; then
 fi
 
 if test "x$WARN" = "xyes" -o "x$WARN" = "xfull" ; then
-	if test "x${CCNAM}" = "xicc" ; then
+	case x${CCNAM} in
+		xicc)
 		WARN_CFLAGS="${WARN_CFLAGS} -Wcheck"
-		# DEBUG_CFLAGS="-fast"
-	else
-		if test "x${CCNAM}" = "xgcc" -o "x${CCNAM}" = "xeko" ; then
+		WARN_CFLAGS="${WARN_CFLAGS} -Wall -Wno-unused-parameter -Wuninitialized -Wconversion -Wcast-qual -pedantic -Wshadow -Wpointer-arith  -Wwrite-strings -Wno-long-long"
+		WARN_CFLAGS="${WARN_CFLAGS} -Wextra -ansi"
+			;;
+		xeko)
+			WARN_CFLAGS="${WARN_CFLAGS} -Wno-unused-parameter"
+			;;
+		xgcc|xgcc44)
 			WARN_CFLAGS="${WARN_CFLAGS} -Wextra -Wno-unused-parameter"
 			if test "x${WARN}" = "xfull" ; then
-				WARN_CFLAGS="${WARN_CFLAGS} -Wuninitialized -Wconversion -Wcast-qual -ansi -pedantic -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wno-long-long"
+				WARN_CFLAGS="${WARN_CFLAGS} -Wuninitialized -Wconversion -Wcast-qual -pedantic -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wno-long-long  -Wno-variadic-macros -Wno-vla"
 			fi
-		else
+			if test "x${HAVE_CXX11}" = "x0" ; then
+				WARN_CFLAGS="${WARN_CFLAGS} -ansi"
+			fi
+			;;
+		xgcc48)
+			WARN_CFLAGS="${WARN_CFLAGS} -Wextra -Wno-unused-parameter"
+			if test "x${WARN}" = "xfull" ; then
+				WARN_CFLAGS="${WARN_CFLAGS} -Wuninitialized -Wconversion -Wcast-qual -pedantic -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wno-long-long  -Wno-variadic-macros -Wno-vla"
+				# WARN_CFLAGS="${WARN_CFLAGS} -fsanitize=address"
+			fi
+			if test "x${HAVE_CXX11}" = "x0" ; then
+				WARN_CFLAGS="${WARN_CFLAGS} -ansi"
+			fi
+
+			;;
+
+		xclang)
+			WARN_CFLAGS="${WARN_CFLAGS} -Wextra -Wno-unused-parameter"
+			if test "x${WARN}" = "xfull" ; then
+				WARN_CFLAGS="${WARN_CFLAGS} -Wuninitialized -Wconversion -Wcast-qual -pedantic -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wno-long-long -Wno-vla-extension -Wno-variadic-macros"
+				WARN_CFLAGS="${WARN_CFLAGS} -D__STRICT_ANSI__"
+			fi
+			;;
+		xclang31)
+			WARN_CFLAGS="${WARN_CFLAGS} -Wextra -Wno-unused-parameter"
+			if test "x${WARN}" = "xfull" ; then
+				WARN_CFLAGS="${WARN_CFLAGS} -Wuninitialized -Wconversion -Wcast-qual -pedantic -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wno-long-long  -g -Wno-vla-extension -Wno-variadic-macros"
+				WARN_CFLAGS="${WARN_CFLAGS} -D__STRICT_ANSI__"
+				# WARN_CFLAGS="${WARN_CFLAGS} -fsanitize=address"
+			fi
+			;;
+
+		*)
 			echo
 			echo "*******************************************************"
 			echo "unsupported compiler ($CCNAM). Please file a bug."
 			echo "*******************************************************"
 			echo
 			WARN_CFLAGS="${WARN_CFLAGS}"
-		fi
-	fi
+	esac
 fi
 
 
 DEFAULT_CFLAGS="${DEFAULT_CFLAGS} ${WARN_CFLAGS} ${DEBUG_CFLAGS}"
-TESTS_CFLAGS="${TESTS_CFLAGS} ${WARN_CFLAGS} ${DEBUG_CFLAGS}"
+TESTS_CFLAGS="${TESTS_CFLAGS} ${WARN_CFLAGS} #${DEBUG_CFLAGS}"
 
 
 AC_HEADER_STDC
 AC_PROG_LIBTOOL
-
+AC_PROG_EGREP
+AC_PROG_SED
 # newer libtool...
 LT_PREREQ([2.2])
 LT_INIT
 
 
+echo "-----------------------------------------------"
+echo "     START  FFLAS-FFPACK CONFIG                "
+echo "-----------------------------------------------"
+
 
 echo "-----------------------------------------------"
+FF_CHECK_OMP
+
+# TODO do FF_CHECK_SIMD and take best, define USE_SSE2/AVX/AVX2/... and have also __FFLASFFPACK_USE_SIMD
+FF_CHECK_SSE
+FF_CHECK_AVX
+
+AVXFLAGS="${SSEFLAGS} ${AVXFLAGS}"
+
+echo "-----------------------------------------------"
+AC_SUBST([PARFLAGS],['${AVXFLAGS} ${OMPFLAGS}'])
+	case x${CCNAM} in
+		xgcc|xgcc44|xgcc48)
+	# With GCC's default ABI version, a __m128 or __m256 are the same types and therefore we cannot
+			# have overloads for both types without linking error.
+			AVXFLAGS="${AVXFLAGS} -fabi-version=6"
+			;;
+		*)
+	esac
+
+AC_SUBST([PARLIBS],['${OMPFLAGS}'])
 
 # Machine characteristics
 
@@ -138,7 +204,7 @@ AC_CHECK_SIZEOF(__int64, 64)
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([float.h limits.h stddef.h stdlib.h string.h sys/time.h stdint.h])
+AC_CHECK_HEADERS([float.h limits.h stddef.h stdlib.h string.h sys/time.h stdint.h pthread.h])
 
 
 # check endianness of the architecture
@@ -149,59 +215,6 @@ AC_C_BIGENDIAN(
 
 # Create some useful data types of fixed, known lengths
 
-# We hereby assume that a character is always one byte
-# LINBOX_INT8="char";
-
-# case $ac_cv_sizeof_char in
-  # 1)
-     # TWO_BYTES=2;
-     # FOUR_BYTES=4;
-     # EIGHT_BYTES=8;
-     # ;;
-  # 8)
-     # TWO_BYTES=16;
-     # FOUR_BYTES=32;
-     # EIGHT_BYTES=64;
-# esac
-
-# case $TWO_BYTES in
-  # $ac_cv_sizeof_short)
-     # LINBOX_INT16="short";
-     # ;;
-  # $ac_cv_sizeof_int)
-     # LINBOX_INT16="int";
-     # ;;
-# esac
-
-# case $FOUR_BYTES in
-  # $ac_cv_sizeof_short)
-     # LINBOX_INT32="short";
-     # ;;
-  # $ac_cv_sizeof_int)
-     # LINBOX_INT32="int";
-     # ;;
-  # $ac_cv_sizeof_long)
-     # LINBOX_INT32="long";
-     # ;;
-# esac
-
-# case $EIGHT_BYTES in
-  # $ac_cv_sizeof_short)
-     # LINBOX_INT64="short";
-     # ;;
-  # $ac_cv_sizeof_int)
-     # LINBOX_INT64="int";
-     # ;;
-  # $ac_cv_sizeof_long)
-     # LINBOX_INT64="long";
-     # ;;
-  # $ac_cv_sizeof_long_long)
-     # LINBOX_INT64="long long";
-     # ;;
-  # $ac_cv_sizeof___int64)
-     # LINBOX_INT64="__int64";
-     # ;;
-# esac
 
 # AC_DEFINE_UNQUOTED(INT8, $LINBOX_INT8, Canonical 8-bit data type)
 # AC_DEFINE_UNQUOTED(INT16, $LINBOX_INT16, Canonical 16-bit data type)
@@ -211,50 +224,56 @@ AC_C_BIGENDIAN(
 echo "-----------------------------------------------"
 # Feature checks
 FF_MISC
-# LB_DRIVER
 
 AC_LANG_CPLUSPLUS
 
+
 echo "-----------------------------------------------"
 
-LB_CHECK_GMP(,,[
-echo '*******************************************************************************'
-echo ' WARNING: GMP not found! (this is not a problem for the moment)'
-echo
-echo ' GMP library compiled with --enable-cxx is required for this library to compile.'
-echo ' Please make sure GMP is installed and specify its location with the option'
-echo ' --with-gmp=<prefix> when running configure.'
-echo ' Do not forget to set/export LD_LIBRARY_PATH if necessary.'
-echo '*******************************************************************************'
-])
+# Getting GMP from Givaro - AB 2014-12-12
+#FF_CHECK_GMP
 
-
-LB_CHECK_GIVARO(,,[
+FF_CHECK_GIVARO(,,[
 echo '*******************************************************************************'
-echo ' WARNING: GIVARO not found! (this is not a problem for the moment)'
+echo ' WARNING: GIVARO not found!'
 echo
 echo ' GIVARO library is required for some tests in this library.'
 echo ' Please make sure GIVARO is installed and specify its location with the'
 echo ' option --with-givaro=<prefix> when running configure.'
 echo ' Do not forget to set/export LD_LIBRARY_PATH if necessary.'
 echo '*******************************************************************************'
+exit 1
 ])
 
 BLAS_FOUND=false
 
-FF_CHECK_BLAS
+FF_CHECK_BLAS_CFLAGS
+FF_CHECK_BLAS_LIBS
+FF_CHECK_MKL
+FF_CHECK_USER_BLAS
+FF_CHECK_USER_LAPACK
 
-FF_CHECK_GOTOBLAS
+# FF_CHECK_BLAS
 
-FF_CHECK_GSL
+# FF_CHECK_GOTOBLAS
 
-if test "$BLAS_FOUND" = "false" ; then
-	FF_CHECK_CBLAS
-fi
+# FF_CHECK_GSL
 
-if test "$BLAS_FOUND" = "false" ; then
-	FF_CHECK_OTHERBLAS
-fi
+# if test "$BLAS_FOUND" = "false" ; then
+	# FF_CHECK_CBLAS
+# fi
+
+# if test "$BLAS_FOUND" = "false" ; then
+	# FF_CHECK_OTHERBLAS
+# fi
+
+# FF_CHECK_LAPACK
+
+# if test "$BLAS_FOUND" = "false" ; then
+	# FF_CHECK_BLAS2
+# fi
+
+
 
 if test "$BLAS_FOUND" = "false" ; then
 	echo ''
@@ -263,15 +282,19 @@ if test "$BLAS_FOUND" = "false" ; then
 	echo
 	echo ' BLAS routines are required for this library to compile. Please'
 	echo ' make sure BLAS are installed and specify its location with the option'
-	echo ' --with-blas=<lib> when running configure (or --with-cblas... see configure --help).'
+	echo ' --with-blas-libs=<libs> and if necessary --with-blas-cflags=<cflags>'
+	echo ' when running configure.'
 	echo '*******************************************************************************'
 	exit 1
 fi
 
-FF_CHECK_LAPACK
 
-BLAS_LIBS="${BLAS_LIBS} ${LAPACK_LIBS}"
-AC_SUBST(BLAS_LIBS)
+
+# BLAS_LIBS="${BLAS_LIBS}"
+# BLAS_LIBS="-L/${BLAS_PATH} ${LAPACK_LIBS} ${BLAS_LIBS}"
+# AC_SUBST(BLAS_LIBS)
+
+# FF_CHECK_CUDA
 
 # AM_CONDITIONAL(FFLASFFPACK_HAVE_BLAS,  test "x$BLAS_FOUND" != "xfalse")
 
@@ -287,31 +310,47 @@ FF_DOC
 	# mkdir ./benchmarks/data  ;
 # fi
 
-CXXFLAGS="${GMP_CFLAGS} ${CXXFLAGS}"
+CXXFLAGS="${CXXFLAGS}"
+
 AC_SUBST(CXXFLAGS)
 
+FF_PRECOMPILE
+
+echo "-----------------------------------------------"
+echo "          END FFLAS-FFPACK CONFIG              "
 echo "-----------------------------------------------"
 
 AC_CONFIG_FILES([
 Makefile
 macros/Makefile
+macros/CodeChunk/Makefile
 fflas-ffpack-config
 fflas-ffpack/Makefile
 fflas-ffpack/fflas/Makefile
+fflas-ffpack/fflas/fflas_fgemm/Makefile
+fflas-ffpack/fflas/fflas_sparse/Makefile
+fflas-ffpack/fflas/fflas_sparse/coo/Makefile
+fflas-ffpack/fflas/fflas_sparse/csr/Makefile
+fflas-ffpack/fflas/fflas_sparse/ell/Makefile
+fflas-ffpack/fflas/fflas_sparse/ell_simd/Makefile
+fflas-ffpack/fflas/fflas_sparse/csr_hyb/Makefile
+fflas-ffpack/fflas/fflas_sparse/sell/Makefile
+fflas-ffpack/fflas/fflas_sparse/hyb_zo/Makefile
+fflas-ffpack/fflas/fflas_igemm/Makefile
+fflas-ffpack/fflas/fflas_simd/Makefile
 fflas-ffpack/ffpack/Makefile
 fflas-ffpack/field/Makefile
-utils/Makefile
+fflas-ffpack/utils/Makefile
+fflas-ffpack/paladin/Makefile
+fflas-ffpack/interfaces/Makefile
+fflas-ffpack/interfaces/libs/Makefile
 doc/Makefile
 tests/Makefile
-benchmark/Makefile
+tests/data/Makefile
+benchmarks/Makefile
+examples/Makefile
 optimiser/Makefile
-benchmark/src/Makefile
-benchmark/src/BLOCKING/Makefile
-benchmark/src/FFLAS_FFPACK/Makefile
-benchmark/src/BLAS_LAPACK/Makefile
-benchmark/html/Makefile
-benchmark/graph/Makefile
-benchmark/test-src/Makefile
+fflas-ffpack.pc
 ])
 AC_OUTPUT
 

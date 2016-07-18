@@ -1,5 +1,5 @@
 # Copyright (c) 2011 FFLAS-FFPACK
-# written by BB <bboyer@imag.fr>
+# written by Brice Boyer (briceboyer) <boyer.brice@gmail.com>
 # ========LICENCE========
 # This file is part of the library FFLAS-FFPACK.
 #
@@ -20,11 +20,24 @@
 
 
 pkgincludesubdir=$(pkgincludedir)/utils
-pkgincludesub_HEADERS=       \
-		args-parser.h        \
-		print-utils.h        \
-		debug.h              \
-		Matio.h
 
-EXTRA_DIST=timer.h timer.C
+
+pkgincludesub_HEADERS= 	\
+	align-allocator.h  	\
+	args-parser.h  		\
+	debug.h  			\
+	fflas_memory.h 		\
+	fflas_randommatrix.h	\
+	flimits.h 			\
+	Matio.h  			\
+	bit_manipulation.h 	\
+	print-utils.h		\
+	timer.h				\
+	cast.h \
+	fflas_intrinsic.h
+
+### is this really extra dist ?
+### this is wrong in a header only lib
+# EXTRA_DIST=timer.h
+
 

@@ -6,20 +6,20 @@
  *
  * Written by Clement Pernet <cpernet@uwaterloo.ca>
  *
- * 
+ *
  * ========LICENCE========
  * This file is part of the library FFLAS-FFPACK.
- * 
+ *
  * FFLAS-FFPACK is free software: you can redistribute it and/or modify
  * it under the terms of the  GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
@@ -27,44 +27,80 @@
  *.
  */
 
-#include <fflas-ffpack/field/nonzero-randiter.h>
-
-#ifndef MIN
-#define MIN(a,b) (a<b)?a:b
-#endif
+#include <givaro/givranditer.h>
 
 //---------------------------------------------------------------------
 // CharpolyArithProg: Las Vegas algorithm to compute the Charpoly
 // over a large field (Z/pZ, s.t.  p > 2n^2)
 //---------------------------------------------------------------------
+//
+//
+namespace FFPACK { namespace Protected {
+	template <class Field>
+	void CompressRows (Field& F, const size_t M,
+			   typename Field::Element_ptr A, const size_t lda,
+			   typename Field::Element_ptr tmp, const size_t ldtmp,
+			   const size_t * d, const size_t nb_blocs);
+
+	template <class Field>
+	void CompressRowsQK (Field& F, const size_t M,
+			     typename Field::Element_ptr A, const size_t lda,
+			     typename Field::Element_ptr tmp, const size_t ldtmp,
+			     const size_t * d,const size_t deg, const size_t nb_blocs);
+
+	template <class Field>
+	void DeCompressRows (Field& F, const size_t M, const size_t N,
+			     typename Field::Element_ptr A, const size_t lda,
+			     typename Field::Element_ptr tmp, const size_t ldtmp,
+			     const size_t * d, const size_t nb_blocs);
+	template <class Field>
+	void DeCompressRowsQK (Field& F, const size_t M, const size_t N,
+			       typename Field::Element_ptr A, const size_t lda,
+			       typename Field::Element_ptr tmp, const size_t ldtmp,
+			       const size_t * d, const size_t deg, const size_t nb_blocs);
+
+	template <class Field>
+	void CompressRowsQA (Field& F, const size_t M,
+			     typename Field::Element_ptr A, const size_t lda,
+			     typename Field::Element_ptr tmp, const size_t ldtmp,
+			     const size_t * d, const size_t nb_blocs);
+	template <class Field>
+	void DeCompressRowsQA (Field& F, const size_t M, const size_t N,
+			       typename Field::Element_ptr A, const size_t lda,
+			       typename Field::Element_ptr tmp, const size_t ldtmp,
+			       const size_t * d, const size_t nb_blocs);
+	} // Protected
+} // FFPACK
+
+
 template <class Field, class Polynomial>
 std::list<Polynomial>&
 FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
-			   const size_t N, typename Field::Element * A, const size_t lda,
+			   const size_t N, typename Field::Element_ptr A, const size_t lda,
 			   const size_t c)
 {
 
 	FFLASFFPACK_check(c);
 
-	size_t * rp = new size_t[2*N];
+	size_t * rp = FFLAS::fflas_new<size_t>(2*N);
 	size_t noc = static_cast<size_t>(ceil(double(N)/double(c)));
 	size_t Nnoc = N*noc;
 
 	// Building the workplace matrix
-	typename Field::Element *K  = new typename Field::Element[Nnoc*c];
-	typename Field::Element *K2 = new typename Field::Element[Nnoc*c];
+	typename Field::Element_ptr K  = FFLAS::fflas_new (F, Nnoc, c);
+	typename Field::Element_ptr K2 = FFLAS::fflas_new (F, Nnoc, c);
 	// for (size_t i = 0 ; i < Nnoc*c ; ++i)
 		// K[i] = F.zero;
 	size_t ldk = N;
 
-	size_t *dA = new size_t[N]; //PA
-	size_t *dK = new size_t[noc*c];
+	size_t *dA = FFLAS::fflas_new<size_t>(N); //PA
+	size_t *dK = FFLAS::fflas_new<size_t>(noc*c);
 	for (size_t i=0; i<noc; ++i)
 		dK[i]=0;
 
 	// Picking a random noc x N block vector U^T
 	typename Field::RandIter g (F);
-	NonzeroRandIter<Field> nzg (F,g);
+    Givaro::GeneralRingNonZeroRandIter<Field> nzg (g);
 	for (size_t i = 0; i < noc; ++i)
  		for (size_t j = 0; j < N; ++j)
  			g.random( *(K + i*ldk +j) );
@@ -82,20 +118,20 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 	size_t w_idx = 0;
 	for (size_t i=0; i<noc; ++i)
 		for (size_t j=0; j<c; ++j, w_idx++)
-			FFLAS::fcopy(F, N, (K2+(w_idx)*ldk), 1, (K+(i+j*noc)*ldk), 1);
+			FFLAS::fassign(F, N, (K+(i+j*noc)*ldk), 1, (K2+(w_idx)*ldk), 1);
 
 	// Copying K <- K2
 	for (size_t i=0; i<noc*c; ++i)
-		FFLAS::fcopy (F, N, (K+i*ldk), 1, K2+i*ldk, 1);
+		FFLAS::fassign (F, N, K2+i*ldk, 1, (K+i*ldk), 1);
 
-	size_t * Pk = new size_t[N];
-	size_t * Qk = new size_t[N];
+	size_t * Pk = FFLAS::fflas_new<size_t>(N);
+	size_t * Qk = FFLAS::fflas_new<size_t>(N);
 	for (size_t i=0; i<N; ++i)
 		Qk[i] = 0;
 	for (size_t i=0; i<N; ++i)
 		Pk[i] = 0;
 
-	size_t R = LUdivine(F, FFLAS::FflasNonUnit, FFLAS::FflasNoTrans, N, N, K, ldk, Pk, Qk, FfpackLQUP);
+	size_t R = LUdivine(F, FFLAS::FflasNonUnit, FFLAS::FflasNoTrans, N, N, K, ldk, Pk, Qk);
 
 	size_t row_idx = 0;
 	size_t ii=0;
@@ -110,8 +146,12 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 			// std::cerr << "FAIL in preconditionning phase:"
 			//           << " degree sequence is not monotonically not increasing"
 			// 	     << std::endl;
-			delete[] rp; delete[] K;
-			delete[] Pk; delete[] Qk; delete[] dA; delete[] dK;
+			FFLAS::fflas_delete( rp);
+			FFLAS::fflas_delete (K);
+			FFLAS::fflas_delete( Pk);
+			FFLAS::fflas_delete( Qk);
+			FFLAS::fflas_delete(dA);
+			FFLAS::fflas_delete( dK);
 			throw CharpolyFailed();
 		}
 		dK[k] = dold = d;
@@ -124,14 +164,14 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 
 	// Selection of the last iterate of each block
 
-	typename Field::Element * K3 = new typename Field::Element[Mk*N];
-	typename Field::Element * K4 = new typename Field::Element[Mk*N];
+	typename Field::Element_ptr K3 = FFLAS::fflas_new (F, Mk, N);
+	typename Field::Element_ptr K4 = FFLAS::fflas_new (F, Mk, N);
 	size_t bk_idx = 0;
 	for (size_t i = 0; i < Mk; ++i){
-		FFLAS::fcopy (F, N, (K3+i*ldk), 1, (K2 + (bk_idx + dK[i]-1)*ldk), 1);
+		FFLAS::fassign (F, N, (K2 + (bk_idx + dK[i]-1)*ldk), 1, (K3+i*ldk), 1);
 		bk_idx += c;
 	}
-	delete[] K2;
+	FFLAS::fflas_delete (K2);
 
 	// K <- K A^T
 	fgemm( F, FFLAS::FflasNoTrans, FFLAS::FflasTrans, Mk, N, N,F.one,  K3, ldk, A, lda, F.zero, K4, ldk);
@@ -163,9 +203,14 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 			for (size_t j = offset+1; j<R; ++j)
 				if (!F.isZero(*(K4 + i*ldk + j))){
 					//std::cerr<<"FAIL C != 0 in preconditionning"<<std::endl;
-					delete[] K3; delete[] K4; delete[] K;
-					delete[] Pk; delete[] Qk; delete[] rp;
-					delete[] dA; delete[] dK;
+					FFLAS::fflas_delete (K3);
+					FFLAS::fflas_delete (K4);
+					FFLAS::fflas_delete (K);
+					FFLAS::fflas_delete( Pk);
+					FFLAS::fflas_delete(Qk);
+					FFLAS::fflas_delete( rp);
+					FFLAS::fflas_delete( dA);
+					FFLAS::fflas_delete( dK);
 					throw CharpolyFailed();
 				}
 			Polynomial P (dK [i]+1);
@@ -184,9 +229,14 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 		for (size_t i=0; i<nb_full_blocks + 1; ++i)
 			for (size_t j=R; j<N; ++j){
 				if (!F.isZero( *(K4+i*ldk+j) )){
-					delete[] K3; delete[] K4; delete[] K;
-					delete[] Pk; delete[] Qk; delete[] rp;
-					delete[] dA; delete[] dK;
+					FFLAS::fflas_delete (K3);
+					FFLAS::fflas_delete (K4);
+					FFLAS::fflas_delete (K);
+					FFLAS::fflas_delete( Pk);
+					FFLAS::fflas_delete( Qk);
+					FFLAS::fflas_delete( rp);
+					FFLAS::fflas_delete( dA);
+					FFLAS::fflas_delete( dK);
 					throw CharpolyFailed();
 				}
 			}
@@ -195,9 +245,9 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 		//	 <<" completing the Krylov matrix"
 		//	 <<std::endl;
 		size_t Nrest = N-R;
-		typename Field::Element * K21 = K + R*ldk;
-		typename Field::Element * K22 = K21 + R;
-		typename Field::Element * Ki, *Ai;
+		typename Field::Element_ptr K21 = K + R*ldk;
+		typename Field::Element_ptr K22 = K21 + R;
+		typename Field::Element_ptr Ki, Ai;
 
 		//  Compute the n-k last rows of A' = P A^T P^T in K2_
 		// A = A . P^t
@@ -221,7 +271,7 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 		ftrsm (F, FFLAS::FflasRight, FFLAS::FflasUpper, FFLAS::FflasNoTrans, FFLAS::FflasNonUnit, Nrest, R,
 		      F.one, K, ldk, K21, ldk);
 
-		typename Field::Element * Arec = new typename Field::Element[Nrest*Nrest];
+		typename Field::Element_ptr Arec = FFLAS::fflas_new (F, Nrest, Nrest);
 		size_t ldarec = Nrest;
 
 		// Creation of the matrix A2 for recursive call
@@ -238,35 +288,35 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 
 		// Recursive call on the complementary subspace
 		CharPoly(F, polyList, Nrest, Arec, ldarec);
-		delete[] Arec;
+		FFLAS::fflas_delete (Arec);
 		frobeniusForm.merge(polyList);
 	}
 
-	delete[] Pk;
-	delete[] Qk;
+	FFLAS::fflas_delete( Pk);
+	FFLAS::fflas_delete( Qk);
 	size_t deg = c+1;
 	for (size_t i=0; i<Mk; ++i)
  		dA[i] = dK[i];
 	bk_idx = 0;
 
-	typename Field::Element *Arp = new typename Field::Element[Ncurr*Ma];
-	typename Field::Element *Ac = new typename Field::Element[Ncurr*Ma];
+	typename Field::Element_ptr Arp = FFLAS::fflas_new (F, Ncurr, Ma);
+	typename Field::Element_ptr Ac = FFLAS::fflas_new (F, Ncurr, Ma);
 	size_t ldac = Ma;
 	size_t ldarp = Ncurr;
 
 	for (size_t i=0; i < Ncurr; ++i)
  		for (size_t j=0; j<Ma; ++j)
 			*(K+i*ldk+j) = *(Ac + i*Ma +j) = *(K4 + i + (j)*ldk);
-	delete[] K4;
+	FFLAS::fflas_delete (K4);
 
-	size_t block_idx, it_idx, rp_val;
 
 	// Main loop of the arithmetic progession
 	while ((nb_full_blocks >= 1) && (Mk > 1)) {
-		delete[] K;
-		delete[] K3;
-		K = new typename Field::Element[Ncurr*Ma];
-		K3 = new typename Field::Element[Ncurr*Ma];
+		size_t block_idx, it_idx, rp_val;
+		FFLAS::fflas_delete (K);
+		FFLAS::fflas_delete (K3);
+		K = FFLAS::fflas_new (F, Ncurr, Ma);
+		K3 = FFLAS::fflas_new (F, Ncurr, Ma);
 		ldk = Ma;
 
 		// Computation of the rank profile
@@ -279,14 +329,24 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 		try{
 			RR = SpecRankProfile (F, Ma, Ncurr, Arp, ldarp, deg-1, rp);
 		} catch (CharpolyFailed){
-			delete[] Arp; delete[] Ac; delete[] K; delete[] K3;
-			delete[] rp; delete[] dA; delete[] dK;
+			FFLAS::fflas_delete (Arp);
+			FFLAS::fflas_delete (Ac);
+			FFLAS::fflas_delete (K);
+			FFLAS::fflas_delete (K3);
+			FFLAS::fflas_delete( rp);
+			FFLAS::fflas_delete( dA);
+			FFLAS::fflas_delete( dK);
 			throw CharpolyFailed();
 		}
 		if (RR < Ncurr){
 			//std::cerr<<"FAIL RR<Ncurr"<<std::endl;
-			delete[] Arp; delete[] Ac; delete[] K; delete[] K3;
-			delete[] rp; delete[] dA; delete[] dK;
+			FFLAS::fflas_delete (Arp);
+			FFLAS::fflas_delete (Ac);
+			FFLAS::fflas_delete (K);
+			FFLAS::fflas_delete (K3);
+			FFLAS::fflas_delete( rp);
+			FFLAS::fflas_delete( dA);
+			FFLAS::fflas_delete( dK);
 			throw CharpolyFailed();
 		}
 
@@ -301,8 +361,13 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 			do {gg++; rp_val++; it_idx++;}
 			while ( /*(gg<Ncurr ) &&*/ (rp[gg] == rp_val) && (it_idx < deg ));
 			if ((block_idx)&&(it_idx > dK[block_idx-1])){
-				delete[] Arp; delete[] Ac;delete[] K; delete[] K3;
-				delete[] rp; delete[] dA; delete[] dK;
+				FFLAS::fflas_delete (Arp);
+				FFLAS::fflas_delete (Ac);
+				FFLAS::fflas_delete (K);
+				FFLAS::fflas_delete (K3);
+				FFLAS::fflas_delete( rp);
+				FFLAS::fflas_delete( dA);
+				FFLAS::fflas_delete(dK);
 				throw CharpolyFailed();
 				//std::cerr<<"FAIL d non decroissant"<<std::endl;
 				//exit(-1);
@@ -319,7 +384,7 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 
 		// Selection of dense colums of K
 		for (size_t i=0; i < nb_full_blocks; ++i){
-			FFLAS::fcopy (F, Ncurr, K+i, ldk, Ac+i, ldac);
+			FFLAS::fassign (F, Ncurr, Ac+i, ldac, K+i, ldk);
 		}
 
 		// K <- QK K
@@ -333,15 +398,15 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 
 		// Copying K3 <- K
 		for (size_t i=0; i<Mk; ++i)
-			FFLAS::fcopy (F, Ncurr, K3+i, ldk, K+i, ldk);
-		CompressRowsQK (F, Mk, K3 + nb_full_blocks*(deg-1)*ldk, ldk,
+			FFLAS::fassign (F, Ncurr, K+i, ldk, K3+i, ldk);
+		Protected::CompressRowsQK (F, Mk, K3 + nb_full_blocks*(deg-1)*ldk, ldk,
 				Arp, ldarp, dK+nb_full_blocks, deg, Mk-nb_full_blocks);
 
 		// K <- PA K
-		CompressRows (F, nb_full_blocks, K, ldk, Arp, ldarp, dA, Ma);
+		Protected::CompressRows (F, nb_full_blocks, K, ldk, Arp, ldarp, dA, Ma);
 
 		// A <- newQA^T K (compress)
-		CompressRowsQA (F, Ma, Ac, ldac, Arp, ldarp, dA, Ma);
+		Protected::CompressRowsQA (F, Ma, Ac, ldac, Arp, ldarp, dA, Ma);
 
 		// K <- A K
 		fgemm (F, FFLAS::FflasNoTrans, FFLAS::FflasNoTrans, Ncurr-Ma, nb_full_blocks, Ma,F.one,
@@ -349,7 +414,7 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 		fgemm (F, FFLAS::FflasNoTrans, FFLAS::FflasNoTrans, Ma, nb_full_blocks, Ma,F.one,
 		       Ac+(Ncurr-Ma)*ldac, ldac, K+(Ncurr-Ma)*ldk, ldk, F.zero, Arp, ldarp);
 		for (size_t i=0; i< Ma; ++i)
-			FFLAS::fcopy(F, nb_full_blocks, K+(Ncurr-Ma+i)*ldk, 1, Arp+i*ldarp, 1);
+			FFLAS::fassign(F, nb_full_blocks, Arp+i*ldarp, 1, K+(Ncurr-Ma+i)*ldk, 1);
 
 		// Copying the last rows of A times K
 		offset = (deg-2)*nb_full_blocks;
@@ -357,7 +422,7 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 			for (size_t j=0; j<Ncurr; ++j)
 				F.assign(*(K+i+j*ldk), F.zero);
 			if (dK[i] == dA[i]) // copy the column of A
-				FFLAS::fcopy (F, Ncurr, K+i, ldk, Ac+i, ldac);
+				FFLAS::fassign (F, Ncurr, Ac+i, ldac, K+i, ldk);
 			else{
 				F.assign (*(K + i + (offset+dK[i]-1)*ldk),F.one);
 			}
@@ -365,16 +430,16 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 		}
 
 		// K <- QA K
-		DeCompressRowsQA (F, Mk, Ncurr, K, ldk, Arp, ldarp, dA, Ma);
+		Protected::DeCompressRowsQA (F, Mk, Ncurr, K, ldk, Arp, ldarp, dA, Ma);
 
 		// K <- QK^T K
-		CompressRowsQK (F, Mk, K + nb_full_blocks*(deg-1)*ldk, ldk, Arp, ldarp,
+		Protected::CompressRowsQK (F, Mk, K + nb_full_blocks*(deg-1)*ldk, ldk, Arp, ldarp,
 				dK+nb_full_blocks, deg, Mk-nb_full_blocks);
 
 		// K <- K^-1 K
-		size_t *P=new size_t[Mk];
-		size_t *Q=new size_t[Mk];
-		if (LUdivine (F, FFLAS::FflasNonUnit, FFLAS::FflasNoTrans, Mk, Mk , K3 + (Ncurr-Mk)*ldk, ldk, P, Q, FfpackLQUP) < Mk){
+		size_t *P=FFLAS::fflas_new<size_t>(Mk);
+		size_t *Q=FFLAS::fflas_new<size_t>(Mk);
+		if (LUdivine (F, FFLAS::FflasNonUnit, FFLAS::FflasNoTrans, Mk, Mk , K3 + (Ncurr-Mk)*ldk, ldk, P, Q) < Mk){
 			// should never happen (not a LAS VEGAS check)
 			//std::cerr<<"FAIL R2 < MK"<<std::endl;
 			//			exit(-1);
@@ -387,11 +452,11 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 			Mk, 0,(int) Mk, K+(Ncurr-Mk)*ldk,ldk, P);
 		fgemm (F, FFLAS::FflasNoTrans, FFLAS::FflasNoTrans, Ncurr-Mk, Mk, Mk,F.mOne,
 		       K3, ldk, K+(Ncurr-Mk)*ldk,ldk,F.one, K, ldk);
-		delete[] P;
-		delete[] Q;
+		FFLAS::fflas_delete( P);
+		FFLAS::fflas_delete( Q);
 
 		// K <- PK^T K
-		DeCompressRows (F, Mk, Ncurr, K, ldk, Arp, ldarp, dK, Mk);
+		Protected::DeCompressRows (F, Mk, Ncurr, K, ldk, Arp, ldarp, dK, Mk);
 
 		// K <- K PK (dA <- dK)
 		if (nb_full_blocks*deg < Ncurr)
@@ -419,21 +484,26 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 			for (size_t j=0; j<nb_full_blocks+1; ++j){
 				if (!F.isZero( *(K+i*ldk+j) )){
 					//std::cerr<<"FAIL C != 0"<<std::endl;
-					delete[] rp; delete[] Arp; delete[] Ac;
-					delete[] K; delete[] K3;
-					delete[] dA; delete[] dK;
+					FFLAS::fflas_delete( rp);
+					FFLAS::fflas_delete (Arp);
+					FFLAS::fflas_delete (Ac);
+					FFLAS::fflas_delete (K);
+					FFLAS::fflas_delete (K3);
+					FFLAS::fflas_delete( dA);
+					FFLAS::fflas_delete( dK);
 					throw CharpolyFailed();
 				}
 			}
 
 		// A <- K
-		delete[] Ac; delete[] Arp;
-		Ac = new typename Field::Element[Ncurr*Mk];
+		FFLAS::fflas_delete (Ac);
+		FFLAS::fflas_delete (Arp);
+		Ac = FFLAS::fflas_new (F, Ncurr, Mk);
 		ldac = Mk;
-		Arp = new typename Field::Element[Ncurr*Mk];
+		Arp = FFLAS::fflas_new (F, Ncurr, Mk);
 		ldarp=Ncurr;
 		for (size_t i=0; i < Ncurr; ++i )
-			FFLAS::fcopy (F, Mk, Ac + i*ldac, 1, K + i*ldk, 1);
+			FFLAS::fassign (F, Mk, K + i*ldk, 1, Ac + i*ldac, 1);
 
 		deg++;
 
@@ -445,15 +515,21 @@ FFPACK::CharpolyArithProg (const Field& F, std::list<Polynomial>& frobeniusForm,
 	for (size_t j=0; j < dK[0]; ++j)
 		F.neg( Pl[j], *(K  + j*ldk));
 	frobeniusForm.push_front(Pl);
-	delete[] rp; delete[] Arp; delete[] Ac; delete[] K; delete[] K3;
-	delete[] dA; delete[] dK;
+	FFLAS::fflas_delete( rp);
+	FFLAS::fflas_delete (Arp);
+	FFLAS::fflas_delete (Ac);
+	FFLAS::fflas_delete (K);
+	FFLAS::fflas_delete (K3);
+	FFLAS::fflas_delete( dA);
+	FFLAS::fflas_delete( dK);
 	return frobeniusForm;
 }
 
+namespace FFPACK { namespace Protected {
 template <class Field>
-void FFPACK::CompressRowsQK (Field& F, const size_t M,
-			   typename Field::Element * A, const size_t lda,
-			   typename Field::Element * tmp, const size_t ldtmp,
+void CompressRowsQK (Field& F, const size_t M,
+			   typename Field::Element_ptr A, const size_t lda,
+			   typename Field::Element_ptr tmp, const size_t ldtmp,
 			   const size_t * d, const size_t deg,const size_t nb_blocs)
 {
 
@@ -461,62 +537,64 @@ void FFPACK::CompressRowsQK (Field& F, const size_t M,
 	size_t currw = d[0]-1;
 	size_t currr = d[0]-1;
 	for (int i = 0; i< int(nb_blocs)-1; ++i){
+		// FFLAS::fassign(F,deg-d[i],M,A+currr*lda,lda,tmp+(size_t)currtmp*ldtmp);
 		for (int j = int(d[i]-1); j<int(deg)-1; ++j, ++currr, ++currtmp)
-			FFLAS::fcopy(F, M, tmp + (size_t)currtmp*ldtmp, 1,  A + currr*lda, 1);
+			FFLAS::fassign(F, M,  A + currr*lda, 1, tmp + (size_t)currtmp*ldtmp, 1);
+		// currr += (deg - d[i]);
 		for (int j=0; j < int(d[i+1]) -1; ++j, ++currr, ++currw){
-			FFLAS::fcopy(F, M, A + (currw)*lda, 1, A+(currr)*lda, 1);
+			FFLAS::fassign(F, M, A+(currr)*lda, 1, A + (currw)*lda, 1);
 		}
 	}
 	for (int i=0; i < currtmp; ++i, ++currw){
-		FFLAS::fcopy (F, M, A + (currw)*lda, 1, tmp + (size_t)i*ldtmp, 1);
+		FFLAS::fassign (F, M, tmp + (size_t)i*ldtmp, 1, A + (currw)*lda, 1);
 	}
 }
 
 template <class Field>
-void FFPACK::CompressRows (Field& F, const size_t M,
-			     typename Field::Element * A, const size_t lda,
-			     typename Field::Element * tmp, const size_t ldtmp,
+void CompressRows (Field& F, const size_t M,
+			     typename Field::Element_ptr A, const size_t lda,
+			     typename Field::Element_ptr tmp, const size_t ldtmp,
 			     const size_t * d, const size_t nb_blocs)
 {
 
 	size_t currd = d[0]-1;
 	size_t curri = d[0]-1;
 	for (int i = 0; i< int(nb_blocs)-1; ++i){
-		FFLAS::fcopy(F, M, tmp + i*ldtmp, 1,  A + currd*lda, 1);
+		FFLAS::fassign(F, M,  A + currd*lda, 1, tmp + i*(int)ldtmp, 1);
 		for (int j=0; j < int(d[i+1]) -1; ++j){
-			FFLAS::fcopy(F, M, A + (curri++)*lda, 1, A+(currd+j+1)*lda, 1);
+			FFLAS::fassign(F, M, A+(currd+(size_t)j+1)*lda, 1, A + (curri++)*lda, 1);
 		}
 		currd += d[i+1];
 	}
 	for (int i=0; i < int(nb_blocs)-1; ++i){
-		FFLAS::fcopy (F, M, A + (curri++)*lda, 1, tmp + i*ldtmp, 1);
+		FFLAS::fassign (F, M, tmp + i*(int)ldtmp, 1, A + (curri++)*lda, 1);
 	}
 }
 
 template <class Field>
-void FFPACK::DeCompressRows (Field& F, const size_t M, const size_t N,
-			     typename Field::Element * A, const size_t lda,
-			     typename Field::Element * tmp, const size_t ldtmp,
+void DeCompressRows (Field& F, const size_t M, const size_t N,
+			     typename Field::Element_ptr A, const size_t lda,
+			     typename Field::Element_ptr tmp, const size_t ldtmp,
 			     const size_t * d, const size_t nb_blocs)
 {
 
 	for (int i=0; i<int(nb_blocs)-1; ++i)
-		FFLAS::fcopy(F, M, tmp + i*ldtmp, 1, A + (N-nb_blocs+i)*lda, 1);
+		FFLAS::fassign(F, M, A + (N-nb_blocs+(size_t)i)*lda, 1, tmp + i*(int)ldtmp, 1);
 
 	size_t w_idx = N - 2;
 	size_t r_idx = N - nb_blocs - 1;
 	int i = int(nb_blocs)-1 ;
 	for (; i--; ){
 		for (size_t j = 0; j<d[i+1]-1; ++j)
-			FFLAS::fcopy (F, M, A + (w_idx--)*lda, 1, A + (r_idx--)*lda, 1);
-		FFLAS::fcopy (F, M, A + (w_idx--)*lda, 1, tmp + i*ldtmp, 1);
+			FFLAS::fassign (F, M, A + (r_idx--)*lda, 1, A + (w_idx--)*lda, 1);
+		FFLAS::fassign (F, M, tmp + i*(int)ldtmp, 1, A + (w_idx--)*lda, 1);
 	}
 }
 
 template <class Field>
-void FFPACK::DeCompressRowsQK (Field& F, const size_t M, const size_t N,
-			       typename Field::Element * A, const size_t lda,
-			       typename Field::Element * tmp, const size_t ldtmp,
+void DeCompressRowsQK (Field& F, const size_t M, const size_t N,
+			       typename Field::Element_ptr A, const size_t lda,
+			       typename Field::Element_ptr tmp, const size_t ldtmp,
 			       const size_t * d, const size_t deg,const size_t nb_blocs)
 {
 
@@ -525,7 +603,7 @@ void FFPACK::DeCompressRowsQK (Field& F, const size_t M, const size_t N,
 	for (int i=0; i<int(nb_blocs)-1; ++i)
 		zeroblockdim += deg - d[i];
 	for (size_t i=0; i < zeroblockdim - 1; ++i, ++currtmp)
-		FFLAS::fcopy(F, M, tmp + currtmp*ldtmp, 1,  A + (N - zeroblockdim +i)*lda, 1);
+		FFLAS::fassign(F, M,  A + (N - zeroblockdim +i)*lda, 1, tmp + currtmp*ldtmp, 1);
 	currtmp--;
 	size_t w_idx = N - 2;
 	size_t r_idx = N - zeroblockdim - 1;
@@ -533,47 +611,50 @@ void FFPACK::DeCompressRowsQK (Field& F, const size_t M, const size_t N,
 	int i = int(nb_blocs)-1 ;
 	for (; i--;){
 		for (size_t j = 0; j < d [i+1] - 1; ++j)
-			FFLAS::fcopy (F, M, A + (w_idx--)*lda, 1, A + (r_idx--)*lda, 1);
+			FFLAS::fassign (F, M, A + (r_idx--)*lda, 1, A + (w_idx--)*lda, 1);
 		for (size_t j = 0; j < deg - d[i]; ++j)
-			FFLAS::fcopy (F, M, A + (w_idx--)*lda, 1, tmp + (currtmp--)*ldtmp, 1);
+			FFLAS::fassign (F, M, tmp + (currtmp--)*ldtmp, 1, A + (w_idx--)*lda, 1);
 	}
 }
 
 template <class Field>
-void FFPACK::CompressRowsQA (Field& F, const size_t M,
-			     typename Field::Element * A, const size_t lda,
-			     typename Field::Element * tmp, const size_t ldtmp,
+void CompressRowsQA (Field& F, const size_t M,
+			     typename Field::Element_ptr A, const size_t lda,
+			     typename Field::Element_ptr tmp, const size_t ldtmp,
 			     const size_t * d, const size_t nb_blocs)
 {
 
 	size_t currd = 0;
 	size_t curri = 0;
 	for (size_t i = 0; i< nb_blocs; ++i){
-		FFLAS::fcopy(F, M, tmp + i*ldtmp, 1,  A + currd*lda, 1);
+		FFLAS::fassign(F, M,  A + currd*lda, 1, tmp + i*ldtmp, 1);
 		for (size_t j=0; j < d[i] -1; ++j)
-			FFLAS::fcopy(F, M, A + (curri++)*lda, 1, A+(currd+j+1)*lda, 1);
+			FFLAS::fassign(F, M, A+(currd+j+1)*lda, 1, A + (curri++)*lda, 1);
 		currd += d[i];
 	}
 	for (size_t i=0; i < nb_blocs; ++i)
-		FFLAS::fcopy (F, M, A + (curri++)*lda, 1, tmp + i*ldtmp, 1);
+		FFLAS::fassign (F, M, tmp + i*ldtmp, 1, A + (curri++)*lda, 1);
 }
 
 template <class Field>
-void FFPACK::DeCompressRowsQA (Field& F, const size_t M, const size_t N,
-			       typename Field::Element * A, const size_t lda,
-			       typename Field::Element * tmp, const size_t ldtmp,
+void DeCompressRowsQA (Field& F, const size_t M, const size_t N,
+			       typename Field::Element_ptr A, const size_t lda,
+			       typename Field::Element_ptr tmp, const size_t ldtmp,
 			       const size_t * d, const size_t nb_blocs)
 {
 
 	for (size_t i=0; i<nb_blocs; ++i)
-		FFLAS::fcopy(F, M, tmp + i*ldtmp, 1, A + (N-nb_blocs+i)*lda, 1);
+		FFLAS::fassign(F, M, A + (N-nb_blocs+i)*lda, 1, tmp + i*ldtmp, 1);
 
 	size_t w_idx = N - 1;
 	size_t r_idx = N - nb_blocs - 1;
 	int i = int(nb_blocs) ;
 	for (; i--; ){
 		for (size_t j = 0; j<d[i]-1; ++j)
-			FFLAS::fcopy (F, M, A + (w_idx--)*lda, 1, A + (r_idx--)*lda, 1);
-		FFLAS::fcopy (F, M, A + (w_idx--)*lda, 1, tmp + i*ldtmp, 1);
+			FFLAS::fassign (F, M, A + (r_idx--)*lda, 1, A + (w_idx--)*lda, 1);
+		FFLAS::fassign (F, M, tmp + i*(int)ldtmp, 1, A + (w_idx--)*lda, 1);
 	}
 }
+
+} // Protected
+} //FFPACK

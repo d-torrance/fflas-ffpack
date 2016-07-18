@@ -27,255 +27,90 @@
 #include <cstring>
 #include <stdio.h>
 #include <stdlib.h>
-#include "fflas-ffpack/fflas/fflas.h"
+//#include "fflas-ffpack/fflas/fflas.h"
+#include "fflas_memory.h"
 
-// Reading and writing matrices over double
-
-#if 0
-// Reading a matrice from a (eventually zipped) file
-double * read_dbl(char * mat_file,int* tni,int* tnj)
-{
-	char *UT, *File_Name;
-	int is_gzipped = 0;
-	size_t s = strlen(mat_file);
-	double* X;
-	if ((mat_file[--s] == 'z') &&
-	    (mat_file[--s] == 'g') &&
-	    (mat_file[--s] == '.')) {
-		is_gzipped = 1;
-		File_Name = "/tmp/bbXXXXXX_";
-		mkstemp(File_Name);
-		UT = new char[s+34+strlen(File_Name)];
-		sprintf(UT,"gunzip -c %s > %s", mat_file, File_Name);
-		system(UT);
-		sprintf(UT,"\\rm %s", File_Name);
-	} else
-		File_Name = mat_file;
-
-	FILE* FileDes = fopen(File_Name, "r");
-	if (FileDes != NULL) {
-		char * tmp = new char[200];// usigned long tni, tnj;
-		fscanf(FileDes,"%d %d %s\n",tni, tnj, &tmp) ;
-		int n=*tni;
-		int p=*tnj;
-		X = new double[n*p];
-		for (int i=0;i<n*p;++i)
-			X[i] = (double) 0;
-		long i,j; long val;
-		fscanf(FileDes,"%ld %ld %ld\n",&i, &j, &val) ;
-		while(i && j) {
-			X[p*(i-1)+j-1] = (double) val;
-			fscanf(FileDes,"%ld %ld %ld\n",&i, &j, &val) ;
-		}
-	}
-
-	fclose(FileDes);
-	if (is_gzipped) system(UT);
-	return X;
-}
-
-// Displays a matrix
-std::ostream& write_dbl(std::ostream& c,
-			double* E,
-			int n, int m, int id)
-{
-
-	for (int i = 0; i<n;++i){
-		for (int j=0; j<m;++j)
-			c << *(E+j+id*i) << " ";
-		c << std::endl;
-	}
-	return c << std::endl;
-}
-#endif
 // Reading and writing matrices over field
 
 // Reading a matrice from a (eventually zipped) file
 template<class Field>
-typename Field::Element * read_field(const Field& F,char * mat_file,int* tni,int* tnj)
+typename Field::Element_ptr read_field(const Field& F, const char * mat_file,int* tni,int* tnj)
 {
-	char *UT, *File_Name;
+	char *UT = NULL;
+	const char* File_Name;
 	int is_gzipped = 0;
 	size_t s = strlen(mat_file);
-	typename Field::Element zero;
-	F.init(zero,0UL);
-	typename Field::Element * X = NULL;
+	typename Field::Element_ptr X = NULL;
 	if ((mat_file[--s] == 'z') &&
 	    (mat_file[--s] == 'g') &&
 	    (mat_file[--s] == '.')) {
 		is_gzipped = 1;
 		char tmp_nam[] = "/tmp/bbXXXXXX_";
+		if (mkstemp(tmp_nam))
+			printf("Error opening file]\n");
 		File_Name  = tmp_nam;
-		mkstemp(File_Name);
-		UT = new char[s+34+strlen(File_Name)];
+
+		UT = FFLAS::fflas_new<char>(s+34+strlen(File_Name));
 		sprintf(UT,"gunzip -c %s > %s", mat_file, File_Name);
-		system(UT);
+		if (system(UT))
+			printf("Error uncompressing file\n");
 		sprintf(UT,"\\rm %s", File_Name);
-	} else
+	} else {
 		File_Name = mat_file;
+	}
+
 	FILE* FileDes = fopen(File_Name, "r");
 	if (FileDes != NULL) {
-		char  tmp [200];// usigned long tni, tnj;
-		fscanf(FileDes,"%d %d %s\n",tni, tnj, tmp) ;
+		char  tmp [200];// unsigned long tni, tnj;
+		if (fscanf(FileDes,"%d %d %199s\n",tni, tnj, tmp)<0)
+			printf("Error Reading first line of file \n");
 		int n=*tni;
 		int p=*tnj;
-		X = new typename Field::Element[n*p];
+		X = FFLAS::fflas_new<typename Field::Element>(n*p);
 		for (int i=0;i<n*p;++i)
-			X[i] = zero;
+			F.assign(X[i], F.zero);
 		long i,j; long val;
-		fscanf(FileDes,"%ld %ld %ld\n",&i, &j, &val) ;
+		if(fscanf(FileDes,"%ld %ld %ld\n",&i, &j, &val)<0)
+			printf("Read Error\n");
 		while(i && j) {
 			F.init(X[p*(i-1)+j-1],val);
-			fscanf(FileDes,"%ld %ld %ld\n",&i, &j, &val) ;
+			if(fscanf(FileDes,"%ld %ld %ld\n",&i, &j, &val)<0)
+				printf("Read Error\n");
 		}
+		fclose(FileDes);
 	}
 
-	fclose(FileDes);
-	if (is_gzipped) system(UT);
+	if (is_gzipped)
+		if (system(UT))
+			printf("Error uncompressing file\n");
+	if (UT != NULL)
+		FFLAS::fflas_delete( UT);
 	return X;
-}
-
-template<class Field>
-void read_field4(const Field& F,char * mat_file,int* tni,int* tnj,
-		 typename Field::Element *& NW,typename Field::Element *& NE,
-		 typename Field::Element *& SW,typename Field::Element *& SE)
-{
-	char *UT, *File_Name;
-	int is_gzipped = 0;
-	size_t s = strlen(mat_file);
-	typename Field::Element zero;
-	F.init(zero,0);
-	typename Field::Element * X;
-	if ((mat_file[--s] == 'z') &&
-	    (mat_file[--s] == 'g') &&
-	    (mat_file[--s] == '.')) {
-		is_gzipped = 1;
-		// XXX on fait pas ça !
-		File_Name = "/tmp/bbXXXXXX_";
-		mkstemp(File_Name);
-		UT = new char[s+34+strlen(File_Name)];
-		sprintf(UT,"gunzip -c %s > %s", mat_file, File_Name);
-		system(UT);
-		sprintf(UT,"\\rm %s", File_Name);
-	} else
-		File_Name = mat_file;
-	FILE* FileDes = fopen(File_Name, "r");
-	if (FileDes != NULL) {
-		char * tmp = new char[200];// usigned long tni, tnj;
-		fscanf(FileDes,"%d %d %s\n",tni, tnj, &tmp) ;
-		int n=*tni;
-		int p=*tnj;
-		int no2= n>>1;
-		int po2 = p>>1;
-		NW = new typename Field::Element[no2*po2];
-		NE = new typename Field::Element[no2*(p-po2)];
-		SW = new typename Field::Element[(n-no2)*po2];
-		SE = new typename Field::Element[(n-no2)*(p-po2)];
-
-		for (int i=0;i<no2*po2;++i)
-			NW[i] = zero;
-		for (int i=0;i<no2*(p-po2);++i)
-			NE[i] = zero;
-		for (int i=0;i<(n-no2)*po2;++i)
-			SW[i] = zero;
-		for (int i=0;i<(n-no2)*(p-po2);++i)
-			SE[i] = zero;
-		long i,j; long val;
-		fscanf(FileDes,"%ld %ld %ld\n",&i, &j, &val) ;
-		while(i && j) {
-			if (i<=no2){
-				if (j<=po2){
-					F.init(NW[po2*(i-1)+j-1],val);
-					fscanf(FileDes,"%ld %ld %ld\n",&i, &j, &val) ;
-				}
-				else{
-					F.init(NE[po2*(i-1)+j-1-po2],val);
-					fscanf(FileDes,"%ld %ld %ld\n",&i, &j, &val) ;
-				}
-			}
-			else{
-				if (j<=po2){
-					F.init(SW[(p-po2)*(i-1-no2)+j-1],val);
-					fscanf(FileDes,"%ld %ld %ld\n",&i, &j, &val) ;
-				}
-				else{
-					F.init(SE[(p-po2)*(i-1-no2)+j-1-po2],val);
-					fscanf(FileDes,"%ld %ld %ld\n",&i, &j, &val) ;
-				}
-			}
-		}
-		//    *A1 = NW;
-		//*A2 = NE;
-		//*A3 = SW;
-		//*A4 = SE;
-
-	}
-
-	fclose(FileDes);
-	if (is_gzipped) system(UT);
 }
 
 // Displays a matrix
 template<class Field>
 std::ostream& write_field(const Field& F,std::ostream& c,
-			  const typename Field::Element* E,
-			  int n, int m, int id, bool mapleFormat = false)
+			  typename Field::ConstElement_ptr E,
+			  int n, int m, int id, bool mapleFormat = false, bool column_major=false)
 {
 
-	double tmp;
-	if (mapleFormat) c << "Matrix(" << n <<',' << m << ", [" ;
+	    //typename Field::Element tmp;
+	// double tmp;
+//	Givaro::Integer tmp;
+	typename Field::Element tmp;
+	F.init(tmp);
+	if (mapleFormat) c << "Matrix(" << n <<',' << m << ",\n[" ;
 	for (int i = 0; i<n;++i){
 		if (mapleFormat) c << '[';
 		for (int j=0; j<m;++j){
-			F.convert(tmp,*(E+j+id*i));
-			c << tmp;
-			if (mapleFormat && j<m-1) c << ',';
-			c << ' ';
-		}
-		if (mapleFormat) c << ']';
-		if (mapleFormat && i<n-1) c << ',';
-		if (!mapleFormat) c << std::endl;
-	}
-	if (mapleFormat) c << "])";
-	return c ;
-}
-
-// Displays a triangular matrix
-//! @todo let the user choose to convert to a non destructive format (not double but long or Integer...)
-template<class Field>
-std::ostream& write_field(const Field& F,std::ostream& c,
-			  const FFLAS::FFLAS_UPLO uplo, const FFLAS::FFLAS_DIAG unit,
-			  const typename Field::Element* E,
-			  int n, int m, int id, bool mapleFormat = false)
-{
-
-	double tmp;
-	if (mapleFormat) c << "Matrix(" << n <<',' << m << ",[";
-	for (int i = 0; i<n;++i){
-		if (mapleFormat) c << '[';
-		// under diag
-		for (int j=0; j<i ;++j){
-			if (uplo == FFLAS::FflasLower)
-				F.convert(tmp,*(E+j+id*i));
-			else tmp = 0 ;
-			c << tmp;
-			if (mapleFormat && j<m-1) c << ',';
-			c << ' ';
-		}
-		// on diag
-		if (unit == FFLAS::FflasNonUnit)
-			F.convert(tmp,*(E+i+id*i));
-		else
-			tmp = 1.;
-		c << tmp;
-		if (mapleFormat && i<m-1) c << ',';
-		c << ' ';
-		// over diag
-		for (int j=i+1; j<m;++j){
-			if (uplo == FFLAS::FflasUpper)
-				F.convert(tmp,*(E+j+id*i));
+			if (column_major)
+				    //F.convert(tmp,*(E+i+id*j));
+				    tmp = *(E+i+id*j);
+				
 			else
-				tmp = 0 ;
+//				F.convert(tmp,*(E+j+id*i));
+				tmp =*(E+j+id*i);
 			c << tmp;
 			if (mapleFormat && j<m-1) c << ',';
 			c << ' ';
@@ -284,8 +119,15 @@ std::ostream& write_field(const Field& F,std::ostream& c,
 		if (mapleFormat && i<n-1) c << ',';
 		if (!mapleFormat) c << std::endl;
 	}
-	if (mapleFormat) c << "])";
+	if (mapleFormat) c << "]);";
 	return c ;
 }
 
+inline std::ostream& write_perm (std::ostream& c, const size_t* P, size_t N){
+	c<<"[ ";
+	for (size_t i=0; i<N; ++i)
+		c<<P[i]<<" ";
+	c<<"]"<<std::endl;
+	return c;
+}
 #endif //__FFLASFFPACK_matio_H
