@@ -3,10 +3,10 @@ Section: math
 Priority: optional
 Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.debian.org>
 Uploaders: Lifeng Sun <lifongsun@gmail.com>,
-	   Doug Torrance <dtorrance@piedmont.edu>
+           Doug Torrance <dtorrance@piedmont.edu>
 DM-Upload-Allowed: yes
-Build-Depends: autotools-dev,
-               debhelper (>= 8.0.0),
+Build-Depends: debhelper (>= 8.0.0),
+               dh-autoreconf,
                libblas-dev,
                libgivaro-dev (<< 3.8.0),
                libgivaro-dev (>= 3.7.0),

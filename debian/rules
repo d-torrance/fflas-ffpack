@@ -11,4 +11,4 @@ override_dh_auto_build-indep:
 	$(MAKE) docs_dev
 
 %:
-	dh $@  --with autotools-dev
+	dh $@  --with autoreconf
