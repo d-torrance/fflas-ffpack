@@ -1,6 +1,6 @@
 --- a/doc/mainpage.doxy
 +++ b/doc/mainpage.doxy
-@@ -37,10 +37,10 @@
+@@ -40,10 +40,10 @@
   *  - \subpage inst. Explains how to configure/install from sources or from the latest
   *  svn version.
   *  - \subpage arch. Describes how FFLAS-FFPACK is organized
