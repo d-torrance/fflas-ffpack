@@ -32,7 +32,7 @@ Description: Finite field linear algebra subroutines/package - common files
  other routines of higher level (such as the one in LAPACK) are also
  produced.
  .
- This package provies architecture independent header files.
+ This package provides architecture independent header files.
 
 Package: fflas-ffpack-user-doc
 Section: doc
@@ -45,7 +45,7 @@ Description: FFLAS-FFPACK User Documentation
  other routines of higher level (such as the one in LAPACK) are also
  produced.
  .
- This package provies user's documentation of FFLAS-FFPACK.
+ This package provides user's documentation of FFLAS-FFPACK.
 
 Package: fflas-ffpack-dev-doc
 Section: doc
@@ -58,4 +58,4 @@ Description: FFLAS-FFPACK Developer Documentation
  other routines of higher level (such as the one in LAPACK) are also
  produced.
  .
- This package provies developer's documentation of FFLAS-FFPACK.
+ This package provides developer's documentation of FFLAS-FFPACK.
