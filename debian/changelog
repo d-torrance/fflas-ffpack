@@ -1,3 +1,11 @@
+fflas-ffpack (2.2.1-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+  * debian/watch
+    - Bump to version 4 and update download location.
+
+ -- Doug Torrance <dtorrance@piedmont.edu>  Mon, 18 Jul 2016 10:54:07 -0400
+
 fflas-ffpack (1.6.0-1) unstable; urgency=low
 
   * Initial release (Closes: #676946)
