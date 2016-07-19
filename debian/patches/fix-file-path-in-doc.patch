@@ -1,3 +1,7 @@
+Description: Fix file paths in documentation.
+Author: Lifeng Sun <lifongsun@gmail.com>
+Last-Update: 2016-07-19
+
 --- a/doc/mainpage.doxy
 +++ b/doc/mainpage.doxy
 @@ -40,10 +40,10 @@
