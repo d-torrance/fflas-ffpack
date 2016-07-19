@@ -1,2 +1,2 @@
 # jquery embedded by doxgen -- see /usr/share/doc/doxygen/README.jquery
-fflas-ffpack-dev-doc: embedded-javascript-library usr/share/doc/fflas-ffpack-dev-doc/jquery.js
+fflas-ffpack-dev-doc: embedded-javascript-library usr/share/doc/fflas-ffpack-dev-doc/jquery.js please use libjs-jquery
