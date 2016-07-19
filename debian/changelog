@@ -1,10 +1,33 @@
 fflas-ffpack (2.2.1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * Tidy packaging with wrap-and-sort.
+  * debian/{compat,control}
+    - Bump debhelper compatibility level to 9.
+  * debian/control
+    - Add myself to Uploaders.
+    - Bump Standards-Version to 3.9.8.
+    - Update Homepage and Vcs-*.
+    - Update versioned dependencies on libgivaro-dev.
+    - Fix typo (Closes: #745298).
+  * debian/{control,rules}
+    - Switch from autotools-dev to dh-autoreconf.
+  * debian/copyright
+    - Update Format and Source.
+    - Remove files which no longer exist.
+  * debian/fflas-ffpack-common.install
+    - Remove fflas-ffpack-configuration.h; file no longer exists.
+  * debian/fflas-ffpack-{dev,user}-doc.lintian-overrides
+    - Override embedded-javascript-library for jquery embedded by doxygen.
+  * debian/patches/fix-file-path-in-doc.patch
+    - Refresh for new release.
+    - Add DEP3 header.
+  * debian/rules
+    - Specify BLAS and LAPACK LIBS.
   * debian/watch
     - Bump to version 4 and update download location.
 
- -- Doug Torrance <dtorrance@piedmont.edu>  Mon, 18 Jul 2016 10:54:07 -0400
+ -- Doug Torrance <dtorrance@piedmont.edu>  Tue, 19 Jul 2016 14:44:40 -0400
 
 fflas-ffpack (1.6.0-1) unstable; urgency=low
 
