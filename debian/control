@@ -8,8 +8,8 @@ DM-Upload-Allowed: yes
 Build-Depends: debhelper (>= 9),
                dh-autoreconf,
                libblas-dev,
-               libgivaro-dev (<< 3.8.0),
-               libgivaro-dev (>= 3.7.0),
+               libgivaro-dev (<< 4.0.2),
+               libgivaro-dev (>= 4.0.1),
                libgmp-dev,
                liblapack-dev
 Build-Depends-Indep: doxygen-latex, texlive-math-extra
